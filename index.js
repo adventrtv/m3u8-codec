@@ -1,163 +1,38 @@
-const tagsSpec = require('./hls_tag_spec');
-const typesSpec = require('./hls_type_spec');
+import makeLineCodec from './src/line-codec.js';
+import { makeRegexCodec } from './src/codecs/regexp.js';
+import { tagSpec, typeSpec } from './src/hls-spec.js';
+
+const lineCodec = makeLineCodec(tagSpec, typeSpec);
+
+// Let's add fancy new tags
+lineCodec.setCustomTag({
+  name: '#EXT-X-CUE-IN',
+  type: null
+});
+
+lineCodec.setCustomTag({
+  name: '#EXT-X-CUE-OUT',
+  type: '<decimal-floating-point>'
+});
 
 /*
-const fs = require('fs');
-const split2 = require('split2');
+typeSpec['<decimal-floating-point-cue-out-cont>'] = regexpCodec(
+  makeRegexCodec(/^([0-9]+.?[0-9]*)\/([0-9]+.?[0-9]*)/, (matches) => `${matches[1]}/${matches[2]}`),
+  [parseFloat, parseFloat],
+  ['seconds', 'totalDuration']
+);
 
-const parse = async (fileStream) => {
-  const output = {};
-
-  fileStream.pipe(split2())
-  .on('data', lineMode(output))
-  .on('close', function() {
-    // destroy the file stream in case the split stream was destroyed
-    file.destroy()
-  });
-
-  return output;
-};
-
-const parseFile = (fileName) => {
-  const fileStream = fs.createReadStream(filename)
-
-  return parse(fileStream);
-};*/
-/*
-const gatherQuotedAttributes = (inArr) => {
-  let inString = false;
-
-  return inArr.reduce((arr, el, index) => {
-    const last = arr[arr.length - 1];
-    const hasQuote = el.indexOf('"') !== -1;
-    const endsWithQuote = el.lastIndexOf('"') === el.length - 1;
-
-    last.push(el);
-
-    if ((hasQuote || inString) && !endsWithQuote) {
-      inString = true;
-      return arr;
-    }
-
-    if (index !== inArr.length - 1) {
-      inString = false;
-      arr.push([]);
-    }
-
-    return arr;
-  },[[]]).map(a => a.join(','));
-};
+lineCodec.setCustomTag({
+  name: '#EXT-X-CUE-OUT-CONT',
+  type: '<decimal-floating-point-cue-out-cont>'
+});
 */
-//var stream = splitFile('my-file.txt')
-const parseAttributes = (input) => {
-  const commaSplit = input.split(',');
-  const quotedCommaSplit = gatherQuotedAttributes(commaSplit);
-
-  return quotedCommaSplit.map((el) => {
-    const [name, value] = el.split('=');
-
-    return {
-      name: name.trim(),
-      value
-    };
-  });
-};
-
-const parseTag = (input, output) => {
-  let firstColon = input.indexOf(':');
-
-  if (firstColon === -1) {
-    firstColon = input.length;
-  }
-  const tag = input.slice(0, firstColon);
-  const tagSpec = tagsSpec[tag];
-  let value = null;
-
-  // Copy spec properties to line
-  Object.assign(output, tagSpec);
-
-  if (firstColon !== input.length) {
-    if (tagSpec.type === null) {
-      throw new Error(`Tag "${output.name}" has no attributes.`);
-    }
-    value = input.slice(firstColon + 1);
-    // output.attributes = parseAttributes(output.value);
-  } else if (tagSpec.type !== null) {
-    throw new Error(`Tag "${output.name}" has attributes but none were found.`);
-  }
-  // TODO: Handle default values
-
-  if (value) {
-    const type = typesSpec[tagSpec.type];
-    type.dec(output, value, tagSpec);
-  }
-};
-/*
-const serializeAttributes = (attributes) => {
-  return attributes.reduce((arr, el) => {
-     arr.push(`${el.name}=${el.value}`);
-
-     return arr;
-  }, []).join(',');
-};
-*/
-const serializeTag = (lineObj) => {
-  const tagSpec = tagsSpec[lineObj.name];
-  const type = typesSpec[tagSpec.type];
-
-  if (type) {
-    let valueString = type.enc('', lineObj, tagSpec);
-
-    return `${lineObj.name}:${valueString}`;
-  }
-
-  return `${lineObj.name}`;
-};
-
-const lineToObj = {
-  dec: (line) => {
-    let lineObj = {};
-
-    if (line.indexOf('#EXT') === 0) {
-      // Found a tag!
-      lineObj.lineType = 'tag';
-      parseTag(line, lineObj);
-    } else if (line.indexOf('#') === 0) {
-      // Found a comment!
-      lineObj.lineType = 'comment';
-      lineObj.value = line;
-    } else if (line.length === 0) {
-      // Empty line
-      lineObj.lineType = 'empty';
-    } else {
-      // URI!
-      lineObj.lineType = 'uri';
-      lineObj.value = line;
-    }
-
-    return lineObj;
-  },
-  enc: (lineObj) => {
-    let str;
-
-    switch(lineObj.lineType) {
-      case 'tag': {
-        str = serializeTag(lineObj);
-        break;
-      }
-      case 'empty': {
-        str = '';
-        break;
-      }
-      default: {
-        str = lineObj.value;
-        break;
-      }
-    }
-
-    return str;
-  }
-};
+//Adding a custom attribute to an existing tag
+lineCodec.getTag('#EXT-X-DATERANGE').setCustomAttribute({
+  name: 'X-TEST-ID',
+  type:'<hexadecimal-sequence>',
+  default: '0xDEADBEEF'
+});
 
 const test1 = `#EXTM3U
 #EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="audio,lo",LANGUAGE="eng",NAME="English",AUTOSELECT=YES,DEFAULT=YES,URI="englo/prog_index.m3u8"
@@ -228,12 +103,16 @@ hls_450k_video.ts
 hls_450k_video.ts
 #EXTINF:10,
 #EXT-X-BYTERANGE:444996@7576776
+#EXT-X-CUE-OUT:20
 hls_450k_video.ts
 #EXTINF:10,
 #EXT-X-BYTERANGE:331444@8021772
+#EXT-X-CUE-OUT-CONT:10/20
 hls_450k_video.ts
 #EXTINF:1.4167,
+#EXT-X-DATERANGE:ID="foo",START-DATE=2012-12-25T14:12:34.123Z
 #EXT-X-BYTERANGE:44556@8353216
+#EXT-X-CUE-IN
 hls_450k_video.ts
 #EXT-X-ENDLIST`;
 
@@ -279,9 +158,15 @@ const lineObjGroup = (lineObj) => {
   return groupedLines;
 };
 
-const obj = test1.split('\n').map(lineToObj.dec);
-console.log(JSON.stringify(lineObjGroup(obj), null, '  '));
+const obj1 = test1.split('\n').map(lineCodec.parse);
+const obj2 = test2.split('\n').map(lineCodec.parse);
+//console.log(JSON.stringify(lineObjGroup(obj1), null, '  '));
+//console.log(JSON.stringify(lineObjGroup(obj2), null, '  '));
 //console.log('<<', obj);
-const out = obj.map(lineToObj.enc).join('\n');
-//console.log('>>', out);
-console.log(test1 === out);
+//console.log(JSON.stringify(obj1, null, '  '));
+//console.log(JSON.stringify(obj2, null, '  '));
+const out1 = obj1.map(lineCodec.stringify).join('\n');
+const out2 = obj2.map(lineCodec.stringify).join('\n');
+console.log('>>', out1);
+console.log('>>', out2);
+//console.log(test1 === out);

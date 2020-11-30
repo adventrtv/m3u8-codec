@@ -1,14 +1,57 @@
 {
   "name": "m3u8-codec",
   "version": "1.0.0",
-  "description": "",
+  "description": "m3u8 parser & generator",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "",
-  "license": "ISC",
+  "contributors": [
+    {
+      "name": "imbcmdth",
+      "github": "https://github.com/imbcmdth"
+    }
+  ],
+  "author": "Ossom Technologies, Inc",
+  "license": "Apache-2.0",
+  "vjsstandard": {
+    "ignore": [
+      "dist",
+      "docs",
+      "test/dist"
+    ]
+  },
   "dependencies": {
-    "split2": "^3.2.2"
+    "@babel/runtime": "^7.5.5",
+    "@videojs/vhs-utils": "^2.2.1",
+    "global": "^4.3.2"
+  },
+  "devDependencies": {
+    "rollup": "^1.19.4",
+    "@videojs/generator-helpers": "~1.2.0",
+    "karma": "^4.0.0",
+    "sinon": "^7.2.2",
+    "videojs-generate-karma-config": "~5.3.1",
+    "videojs-generator-verify": "~2.0.0",
+    "videojs-generate-rollup-config": "~5.0.1",
+    "videojs-standard": "^8.0.3"
+  },
+  "type": "module",
+  "generator-videojs-plugin": {
+    "version": "7.7.3"
+  },
+  "browserslist": [
+    "defaults",
+    "ie 11"
+  ],
+  "lint-staged": {
+    "*.js": [
+      "vjsstandard --fix",
+      "git add"
+    ],
+    "README.md": [
+      "doctoc --notitle",
+      "git add"
+    ]
   }
 }
