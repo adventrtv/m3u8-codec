@@ -14,7 +14,7 @@ const singleMatchToQuotedString = (matches) => `"${matches[1]}"`;
 
 const dateToString = (matches) => matches[1].toISOString();
 
-const resolutionToString = (matches) => `${matches[1]}x${matches[2]}`
+const resolutionToString = (matches) => `${matches[1]}x${matches[2]}`;
 
 const byteRangeToString = (matches) => {
   return `${matches[1]}${!isNaN(matches[2]) ? '@' + matches[2] : ''}`;

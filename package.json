@@ -2,9 +2,15 @@
   "name": "m3u8-codec",
   "version": "1.0.0",
   "description": "m3u8 parser & generator",
-  "main": "index.js",
+  "main": "dist/m3u8-codec.cjs.js",
+  "module": "dist/m3u8-codec.es.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build-test": "cross-env-shell TEST_BUNDLE_ONLY=1 'npm run build'",
+    "build-prod": "cross-env-shell NO_TEST_BUNDLE=1 'npm run build'",
+    "build": "rollup -c scripts/rollup.config.js",
+    "lint": "vjsstandard",
+    "test": "qunit test/dist/bundle.js",
+    "watch": "npm run build -- -w"
   },
   "contributors": [
     {
@@ -36,7 +42,6 @@
     "videojs-generate-rollup-config": "~5.0.1",
     "videojs-standard": "^8.0.3"
   },
-  "type": "module",
   "generator-videojs-plugin": {
     "version": "7.7.3"
   },

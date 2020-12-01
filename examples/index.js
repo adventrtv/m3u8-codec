@@ -1,4 +1,5 @@
-import makeLineCodec from './src/line-codec.js';
+const { m3u8NestedCodec } = require('../dist/m3u8-codec.cjs.js');
+/*
 import { tagSpec, typeSpec } from './src/hls-spec.js';
 
 // imports to help me build a new "type"
@@ -14,10 +15,11 @@ const manifestPlaylistCodec = makeLineCodec(onlyManifestTags, typeSpec);
 // Let's add fancy new tags
 mediaPlaylistCodec.setCustomTag({
   name: '#EXT-X-CUE-IN',
-  type: null, /*'<attribute-list>',
-  attributes: [
-    { name: 'foo', type: 'not_a_real_type' }
-  ]*/
+  type: null,
+  // type: '<attribute-list>',
+  // attributes: [
+  //   { name: 'foo', type: 'not_a_real_type' }
+  // ]
 });
 
 mediaPlaylistCodec.setCustomTag({
@@ -37,19 +39,21 @@ mediaPlaylistCodec.setCustomType(
 mediaPlaylistCodec.setCustomTag({
   name: '#EXT-X-CUE-OUT-CONT',
   type: '<decimal-floating-point-cue-out-cont>'
-}/*,
-{
-  '<decimal-floating-point-cue-out-cont>': makeValueCodecFactory(
-    makeRegexCodec(/^([0-9]+.?[0-9]*)\/([0-9]+.?[0-9]*)/, (matches) => `${matches[1]}/${matches[2]}`),
-    [parseFloat, parseFloat],
-    ['seconds', 'totalDuration']
-  )
-}*/);
+}
+// ,
+// {
+//   '<decimal-floating-point-cue-out-cont>': makeValueCodecFactory(
+//     makeRegexCodec(/^([0-9]+.?[0-9]*)\/([0-9]+.?[0-9]*)/, (matches) => `${matches[1]}/${matches[2]}`),
+//     [parseFloat, parseFloat],
+//     ['seconds', 'totalDuration']
+//   )
+// }
+);
 
-/*manifestPlaylistCodec.setCustomTag({
-  name: '#EXT-X-CUE-OUT-CONT',
-  type: '<decimal-floating-point-cue-out-cont>'
-});*/
+// manifestPlaylistCodec.setCustomTag({
+//   name: '#EXT-X-CUE-OUT-CONT',
+//   type: '<decimal-floating-point-cue-out-cont>'
+// });
 
 //Adding a custom attribute to an existing tag
 mediaPlaylistCodec.getTag('#EXT-X-DATERANGE').setCustomAttribute({
@@ -57,7 +61,7 @@ mediaPlaylistCodec.getTag('#EXT-X-DATERANGE').setCustomAttribute({
   type:'<hexadecimal-sequence>',
   default: '0xDEADBEEF'
 });
-
+*/
 const test1 = `#EXTM3U
 #EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="audio,lo",LANGUAGE="eng",NAME="English",AUTOSELECT=YES,DEFAULT=YES,URI="englo/prog_index.m3u8"
 #EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="audio,lo",LANGUAGE="fre",NAME="Français",AUTOSELECT=YES,DEFAULT=NO,URI="frelo/prog_index.m3u8"
@@ -127,70 +131,25 @@ hls_450k_video.ts
 hls_450k_video.ts
 #EXTINF:10,
 #EXT-X-BYTERANGE:444996@7576776
-#EXT-X-CUE-OUT:20
 hls_450k_video.ts
 #EXTINF:10,
 #EXT-X-BYTERANGE:331444@8021772
-#EXT-X-CUE-OUT-CONT:10/20
 hls_450k_video.ts
 #EXTINF:1.4167,
 #EXT-X-DATERANGE:ID="foo",START-DATE=2012-12-25T14:12:34.123Z
 #EXT-X-BYTERANGE:44556@8353216
-#EXT-X-CUE-IN
 hls_450k_video.ts
 #EXT-X-ENDLIST`;
 
-const lineObjGroup = (lineObj) => {
-  const groupedLines = {
-    global:[],
-    segments: []
-  };
-
-  lineObj.reduce((arr, obj) => {
-    if (obj.lineType === 'tag' && !obj.segment) {
-      arr.push(obj);
-    }
-
-    return arr;
-  }, groupedLines.global);
-
-  // todo:
-  //   spread media-sequence?
-  //   spread discontinuity-sequence?
-
-  lineObj.reduce((arr, obj) => {
-    let last = arr[arr.length - 1];
-
-    if (!obj.segment && obj.lineType !== 'uri') {
-      return arr;
-    }
-
-    if (!last || last.uri) {
-      last = {};
-      arr.push(last);
-    }
-
-    if (obj.lineType === 'tag' && obj.segment) {
-      last[obj.name] = obj;
-    } else if (obj.lineType === 'uri') {
-      last.uri = obj.value;
-    }
-
-    return arr;
-  }, groupedLines.segments);
-
-  return groupedLines;
-};
-
-const obj1 = test1.split('\n').map(manifestPlaylistCodec.parse);
-const obj2 = test2.split('\n').map(mediaPlaylistCodec.parse);
-//console.log(JSON.stringify(lineObjGroup(obj1), null, '  '));
-//console.log(JSON.stringify(lineObjGroup(obj2), null, '  '));
-//console.log('<<', obj);
-//console.log(JSON.stringify(obj1, null, '  '));
-//console.log(JSON.stringify(obj2, null, '  '));
-const out1 = obj1.map(manifestPlaylistCodec.stringify).join('\n');
-const out2 = obj2.map(mediaPlaylistCodec.stringify).join('\n');
-console.log('>>', out1);
-console.log('>>', out2);
-//console.log(test1 === out);
+const obj1 = m3u8NestedCodec.parse(test1);
+const obj2 = m3u8NestedCodec.parse(test2);
+// console.log(JSON.stringify(lineObjGroup(obj1), null, '  '));
+// console.log(JSON.stringify(lineObjGroup(obj2), null, '  '));
+// console.log('<<', obj);
+console.log(JSON.stringify(obj1, null, '  '));
+console.log(JSON.stringify(obj2, null, '  '));
+// const out1 = obj1.map(manifestPlaylistCodec.stringify).join('\n');
+// const out2 = obj2.map(mediaPlaylistCodec.stringify).join('\n');
+// console.log('>>', out1);
+// console.log('>>', out2);
+// console.log(test1 === out);

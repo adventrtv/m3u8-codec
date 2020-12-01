@@ -26,7 +26,8 @@ const tagSpec = [
   // PLAYLIST-ONLY, SEGMENT TAGS
   {
     name: '#EXTINF',
-    type: '<decimal-floating-point-duration>', // (ctx) => ctx['#EXT-X-VERSION'].value < 3 ? '<decimal-integer-duration>' : '<decimal-floating-point-duration>'
+    type: '<decimal-floating-point-duration>',
+    // (ctx) => ctx['#EXT-X-VERSION'].value < 3 ? '<decimal-integer-duration>' : '<decimal-floating-point-duration>'
     playlistType: 'media',
     appliesToNextUri: true,
     description: 'The EXTINF tag specifies the duration of a Media Segment.  It applies only to the next Media Segment.  This tag is REQUIRED for each Media Segment.'
@@ -335,8 +336,8 @@ const tagSpec = [
         allowed: (ctx) => ctx.TYPE === 'CLOSED-CAPTIONS',
         enum: [
           'CC1', 'CC2', 'CC3', 'CC4',
-           'SERVICE1',  'SERVICE2',  'SERVICE3',  'SERVICE4',  'SERVICE5',  'SERVICE6',  'SERVICE7',  'SERVICE8',
-           'SERVICE9', 'SERVICE10', 'SERVICE11', 'SERVICE12', 'SERVICE13', 'SERVICE14', 'SERVICE15', 'SERVICE16',
+          'SERVICE1', 'SERVICE2', 'SERVICE3', 'SERVICE4', 'SERVICE5', 'SERVICE6', 'SERVICE7', 'SERVICE8',
+          'SERVICE9', 'SERVICE10', 'SERVICE11', 'SERVICE12', 'SERVICE13', 'SERVICE14', 'SERVICE15', 'SERVICE16',
           'SERVICE17', 'SERVICE18', 'SERVICE19', 'SERVICE20', 'SERVICE21', 'SERVICE22', 'SERVICE23', 'SERVICE24',
           'SERVICE25', 'SERVICE26', 'SERVICE27', 'SERVICE28', 'SERVICE29', 'SERVICE30', 'SERVICE31', 'SERVICE32',
           'SERVICE33', 'SERVICE34', 'SERVICE35', 'SERVICE36', 'SERVICE37', 'SERVICE38', 'SERVICE39', 'SERVICE40',
@@ -355,7 +356,7 @@ const tagSpec = [
         name: 'CHANNELS',
         type: '<quoted-string>',
         description: 'The value is a quoted-string that specifies an ordered, backslash-separated ("/") list of parameters.  If the TYPE attribute is AUDIO, then the first parameter is a count of audio channels expressed as a decimal-integer, indicating the maximum number of independent, simultaneous audio channels present in any Media Segment in the Rendition.  For example, an AC-3 5.1 Rendition would have a CHANNELS="6" attribute.  No other CHANNELS parameters are currently defined.'
-      },
+      }
     ],
     playlistType: 'manifest',
     description: 'The EXT-X-MEDIA tag is used to relate Media Playlists that contain alternative Renditions (Section 4.3.4.2.1) of the same content.  For example, three EXT-X-MEDIA tags can be used to identify audio-only Media Playlists that contain English, French, and Spanish Renditions of the same presentation.  Or, two EXT-X-MEDIA tags can be used to identify video-only Media Playlists that show two different camera angles.'

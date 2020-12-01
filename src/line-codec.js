@@ -4,7 +4,7 @@
 const baseProperties = [
   'name', 'type',
   'playlistType', 'appliesToNextUri',
-//  'default', 'allowed', 'required',
+  // 'default', 'allowed', 'required',
   'minVersion', 'maxVersion'
 ];
 
@@ -53,9 +53,15 @@ const createTagInstance = (tag) => {
 };
 
 const generateTagMapElement = (typeSpec) => {
-  const attributeElementGenerator = (attrType) => {
+  const attributeElementGenerator = (parentTag) => (attrType) => {
     if (attrType.type !== null) {
-      const attrCodec = typeSpec[attrType.type](attrType);
+      const attrTypeSpec = typeSpec[attrType.type];
+
+      if (!attrTypeSpec) {
+        throw new Error(`Tag "${parentTag.name}" defines an attribute "${attrType.name}" which declares unknown type "${attrType.type}"`);
+      }
+
+      const attrCodec = attrTypeSpec(attrType);
 
       attrType.parse = attrCodec.parse;
       attrType.stringify = attrCodec.stringify;
@@ -70,7 +76,13 @@ const generateTagMapElement = (typeSpec) => {
     const attrTypes = tagType.attributes;
 
     if (tagType.type !== null) {
-      const tagCodec = typeSpec[tagType.type](tagObject);
+      const tagTypeSpec = typeSpec[tagType.type];
+
+      if (!tagTypeSpec) {
+        throw new Error(`Tag "${tagType.name}" declares unknown type "${tagType.type}"`);
+      }
+
+      const tagCodec = tagTypeSpec(tagObject);
 
       tagObject.parse = tagCodec.parse;
       tagObject.stringify = tagCodec.stringify;
@@ -78,7 +90,9 @@ const generateTagMapElement = (typeSpec) => {
     tagObject.createInstance = createTagInstance(tagObject);
 
     if (attrTypes) {
-      tagObject.attributes = new Map(attrTypes.map(attributeElementGenerator));
+      const mapAttributes = attributeElementGenerator(tagType);
+
+      tagObject.attributes = new Map(attrTypes.map(mapAttributes));
 
       const attrs = tagObject.attributes;
 
@@ -89,14 +103,15 @@ const generateTagMapElement = (typeSpec) => {
   };
 };
 
-const buildCodec = (tagSpec, typeSpec) => {
-  const defaultTagMapElementGenerator = generateTagMapElement(typeSpec);
+const buildCodec = (mainTagSpec, mainTypeSpec) => {
+  const localTypeSpec = Object.create(mainTypeSpec);
+  const defaultTagMapElementGenerator = generateTagMapElement(localTypeSpec);
   // Build O(1) lookup table(s) from spec
-  const tagsSpec = new Map(tagSpec.map(defaultTagMapElementGenerator));
+  const tagSpecMap = new Map(mainTagSpec.map(defaultTagMapElementGenerator));
 
   const parseTag = (input) => {
     let tagName = input;
-    let firstColon = input.indexOf(':');
+    const firstColon = input.indexOf(':');
     let tagValue = '';
 
     if (firstColon !== -1) {
@@ -104,7 +119,7 @@ const buildCodec = (tagSpec, typeSpec) => {
       tagValue = input.slice(firstColon + 1);
     }
 
-    const tagSpec = tagsSpec.get(tagName);
+    const tagSpec = tagSpecMap.get(tagName);
 
     if (!tagSpec) {
       throw new Error(`Found unknown tag "${tagName}".`);
@@ -112,12 +127,13 @@ const buildCodec = (tagSpec, typeSpec) => {
 
     const output = tagSpec.createInstance();
 
+    // TODO: Stop special-casing type null?
     if (tagSpec.type === null && tagValue !== '') {
       throw new Error(`Tag "${tagSpec.name}" has no value but found "${tagValue}".`);
     }
 
     if (tagSpec.type !== null && tagValue === '') {
-      throw new Error(`Tag "${tagSpec.name}" has attributes but none were found.`);
+      throw new Error(`Tag "${tagSpec.name}" has a value but none were found.`);
     }
 
     if (tagValue !== '') {
@@ -128,10 +144,11 @@ const buildCodec = (tagSpec, typeSpec) => {
   };
 
   const serializeTag = (lineObj) => {
-    const tagSpec = tagsSpec.get(lineObj.name);
+    const tagSpec = tagSpecMap.get(lineObj.name);
 
+    // TODO: Stop special-casing type null?
     if (tagSpec.type !== null) {
-      let valueString = tagSpec.stringify('', lineObj);
+      const valueString = tagSpec.stringify('', lineObj);
 
       return `${lineObj.name}:${valueString}`;
     }
@@ -141,10 +158,16 @@ const buildCodec = (tagSpec, typeSpec) => {
 
   const setCustomTag = (newTagSpec, newTypeSpec = null) => {
     let localTagMapElementGenerator = defaultTagMapElementGenerator;
+
     if (newTypeSpec) {
       localTagMapElementGenerator = generateTagMapElement(newTypeSpec);
     }
-    tagsSpec.set.apply(tagsSpec, localTagMapElementGenerator(newTagSpec));
+
+    tagSpecMap.set.apply(tagSpecMap, localTagMapElementGenerator(newTagSpec));
+  };
+
+  const setCustomType = (newTypeName, newTypeSpec) => {
+    localTypeSpec[newTypeName] = newTypeSpec;
   };
 
   return {
@@ -165,40 +188,35 @@ const buildCodec = (tagSpec, typeSpec) => {
       } else if (lineStr.length === 0) {
         // Empty line
         return {
-          lineType: 'empty',
-        };
-      } else {
-        // URI!
-        return {
-          lineType: 'uri',
-          value: lineStr
+          lineType: 'empty'
         };
       }
-
-      return lineObj;
+      // URI!
+      return {
+        lineType: 'uri',
+        value: lineStr
+      };
     },
     stringify: (lineObj) => {
       let str;
 
-      switch(lineObj.lineType) {
-        case 'tag': {
-          str = serializeTag(lineObj);
-          break;
-        }
-        case 'empty': {
-          str = '';
-          break;
-        }
-        default: {
-          str = lineObj.value;
-          break;
-        }
+      switch (lineObj.lineType) {
+      case 'tag':
+        str = serializeTag(lineObj);
+        break;
+      case 'empty':
+        str = '';
+        break;
+      default:
+        str = lineObj.value;
+        break;
       }
 
       return str;
     },
     setCustomTag,
-    getTag: (tagName) => tagsSpec.get(tagName)
+    getTag: (tagName) => tagSpecMap.get(tagName),
+    setCustomType
   };
 };
 
