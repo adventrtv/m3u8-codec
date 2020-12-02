@@ -1,79 +1,82 @@
 import m3u8Codec from './m3u8.js';
 
-const detectPlaylistType = (arr) => {
-  const {manifest, media} = arr.reduce((results, line) => {
-    if (line.lineType==='tag' && line.playlistType !== 'both') {
-      results[line.playlistType]++;
-    }
-    return results;
-  },{manifest: 0, media: 0});
-
-  if (manifest > media) {
-    if (media !== 0) {
-      console.warn('Detected a Manifest Playlist with some Media tags.');
-    }
-    return 'manifest';
-  } else {
-    if (manifest !== 0) {
-      console.warn('Detected a Manifest Playlist with some Media tags.');
-    }
-    return 'playlist';
-  }
-};
-
-const groupPlaylistObject = (hlsObject, type) => {
-  const groupLocation = type === 'manifest' ? 'playlists': 'segments';
+const groupPlaylistObject = (hlsObject) => {
+  const groupLocation = hlsObject.playlistType === 'manifest' ? 'playlists': 'segments';
   const groupedLines = {
-    global:[],
+    playlistType: hlsObject.playlistType,
+    globals:[],
     [groupLocation]: []
   };
+  const commentStack = [];
+  let pendingUriTags = [];
 
-  hlsObject.reduce((arr, obj) => {
-    if (obj.lineType === 'tag' && !obj.appliesToNextUri) {
-      arr.push(obj);
+  hlsObject.forEach((obj) => {
+    if (obj.lineType === 'empty') {
+      return;
     }
 
-    return arr;
-  }, groupedLines.global);
+    if (obj.lineType === 'comment') {
+      commentStack.push(obj);
+      return;
+    }
+
+    if (obj.lineType === 'tag') {
+      if (!obj.appliesToNextUri) {
+        if (commentStack.length) {
+          groupedLines.globals = groupedLines.globals.concat(commentStack);
+          commentStack.length = 0;
+        }
+        groupedLines.globals.push(obj);
+        return;
+      }
+
+      if (commentStack.length) {
+        pendingUriTags = pendingUriTags.concat(commentStack);
+        commentStack.length = 0;
+      }
+
+      pendingUriTags.push(obj);
+      return;
+    }
+
+    let group = [];
+
+    // Finally we can ONLY have a uri type line
+    if (commentStack.length) {
+      group = group.concat(commentStack);
+      commentStack.length = 0;
+    }
+    if (pendingUriTags.length) {
+      group = group.concat(pendingUriTags);
+      pendingUriTags.length = 0;
+    }
+    group.push(obj);
+    groupedLines[groupLocation].push(group);
+  });
 
   // todo:
   //   spread media-sequence?
   //   spread discontinuity-sequence?
 
-  hlsObject.reduce((arr, obj) => {
-    let last = arr[arr.length - 1];
-
-    if (!obj.appliesToNextUri && obj.lineType !== 'uri') {
-      return arr;
-    }
-
-    if (!last || last.uri) {
-      last = {};
-      arr.push(last);
-    }
-
-    if (obj.lineType === 'tag' && obj.appliesToNextUri) {
-      last[obj.name] = obj;
-    } else if (obj.lineType === 'uri') {
-      last.uri = obj.value;
-    }
-
-    return arr;
-  }, groupedLines[groupLocation]);
-
   return groupedLines;
 };
+
+const ungroupPlaylistObject = (hlsObject) => {
+  const group = hlsObject.playlists || hlsObject.segments;
+
+  return hlsObject.globals.concat(group.flat());
+}
 
 export default {
   parse: (m3u8Data) => {
     const hlsObject = m3u8Codec.parse(m3u8Data);
-    const playlistType = detectPlaylistType(hlsObject);
+    const nestedHlsObject = groupPlaylistObject(hlsObject);
 
-    return groupPlaylistObject(hlsObject, playlistType);
+    return nestedHlsObject;
   },
-  stringify: (hlsObject) => {
-    const lines = object.map(lineCodec.stringify);
-    const m3u8Data = lines.join('\n');
+  stringify: (nestedHlsObject) => {
+    const hlsObject = ungroupPlaylistObject(nestedHlsObject);
+    const m3u8Data = m3u8Codec.stringify(hlsObject);
 
     return m3u8Data;
   },

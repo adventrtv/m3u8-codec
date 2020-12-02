@@ -1,27 +1,5 @@
 import { identity } from './type-casts.js';
-
-const getProperty = (obj, propArray) => {
-  return propArray.reduce((subObj, prop) => {
-    if (subObj) {
-      return subObj[prop];
-    }
-    return subObj;
-  }, obj);
-};
-
-const setProperty = (obj, propArray, value) => {
-  propArray.reduce((subObj, prop, index) => {
-    if (index === propArray.length - 1) {
-      subObj[prop] = value;
-      return;
-    }
-    subObj[prop] = subObj[prop] || {};
-
-    return subObj[prop];
-  }, obj);
-
-  return obj;
-};
+import { setProperty, getProperty } from '../helpers/props.js';
 
 const makeValueCodecFactory = (typeRegexpCodec, casterArray = [identity], namedCaptureArray = ['value']) => {
   const capturePropertyPaths = namedCaptureArray.map(c => c.split('.'));
@@ -55,7 +33,7 @@ const makeValueCodecFactory = (typeRegexpCodec, casterArray = [identity], namedC
 
           if (match !== undefined) {
             const matchCaster = casterArray[index];
-            const matchValue = matchCaster(match, typeContext);
+            const matchValue = matchCaster.toValue(typeContext, match, index, matches);
 
             setProperty(output, capturePropertyPath, matchValue);
           }
@@ -64,15 +42,22 @@ const makeValueCodecFactory = (typeRegexpCodec, casterArray = [identity], namedC
         return consumedChars;
       },
       stringify: (output, obj) => {
-        const matches = [];
+        const values = [];
 
         capturePropertyPaths.forEach((capturePropertyPath, index) => {
           const value = getProperty(obj, capturePropertyPath);
 
+
           if (value !== null && value !== undefined) {
-            matches[index] = value;
+            values[index] = value;
           }
         });
+
+        const matches = values.reduce((matches, match, index) => {
+          const matchCaster = casterArray[index];
+          matches[index] = matchCaster.fromValue(typeContext, match, index, values);
+          return matches;
+        }, []);
 
         const stringifiedObj = typeRegexpCodec.stringify([null, ...matches]);
 

@@ -1,4 +1,5 @@
-const { m3u8NestedCodec } = require('../dist/m3u8-codec.cjs.js');
+const { m3u8Codec, m3u8NestedCodec, videojsCodec } = require('../');
+
 /*
 import { tagSpec, typeSpec } from './src/hls-spec.js';
 
@@ -85,71 +86,36 @@ const test2 = `#EXTM3U
 #EXT-X-VERSION:4
 #EXT-X-ALLOW-CACHE:YES
 #EXT-X-MEDIA-SEQUENCE:0
-#EXT-X-PLAYLIST-TYPE:VOD
 #EXT-X-PROGRAM-DATE-TIME:2012-12-25T14:12:34.123Z
 #EXTINF:10,testing this, thing!""
 #EXT-X-BYTERANGE:522828@0
 hls_450k_video.ts
 #EXTINF:10,
-#EXT-X-BYTERANGE:587500@522828
-hls_450k_video.ts
-#EXTINF:10,
-#EXT-X-BYTERANGE:713084@1110328
-hls_450k_video.ts
-#EXTINF:10,
-#EXT-X-BYTERANGE:476580@1823412
-hls_450k_video.ts
-#EXTINF:10,
-#EXT-X-BYTERANGE:535612@2299992
-hls_450k_video.ts
-#EXTINF:10,
-#EXT-X-BYTERANGE:207176@2835604
-hls_450k_video.ts
-#EXTINF:10,
-#EXT-X-BYTERANGE:455900@3042780
-hls_450k_video.ts
-#EXTINF:10,
-#EXT-X-BYTERANGE:657248@3498680
-hls_450k_video.ts
-#EXTINF:10,
-#EXT-X-BYTERANGE:571708@4155928
-hls_450k_video.ts
-#EXTINF:10,
-#EXT-X-BYTERANGE:485040@4727636
-hls_450k_video.ts
-#EXTINF:10,
-#EXT-X-BYTERANGE:709136@5212676
-hls_450k_video.ts
-#EXTINF:10,
-#EXT-X-BYTERANGE:730004@5921812
-hls_450k_video.ts
-#EXTINF:10,
-#EXT-X-BYTERANGE:456276@6651816
-hls_450k_video.ts
-#EXTINF:10,
-#EXT-X-BYTERANGE:468684@7108092
-hls_450k_video.ts
-#EXTINF:10,
-#EXT-X-BYTERANGE:444996@7576776
-hls_450k_video.ts
-#EXTINF:10,
 #EXT-X-BYTERANGE:331444@8021772
+#This is a video segment!
+#This follows the previous comment...
+#EXT-X-DISCONTINUITY
 hls_450k_video.ts
 #EXTINF:1.4167,
-#EXT-X-DATERANGE:ID="foo",START-DATE=2012-12-25T14:12:34.123Z
+#EXT-X-KEY:METHOD=AES-128,URI="https://priv.example.com/key.php?r=54",IV=0x00000000000000000000014BB69D61E4
+#EXT-X-MAP:URI="main.mp4",BYTERANGE="720@0"
+#EXTINF:6.00600,
+#EXT-X-BYTERANGE:5666510@720
+main.mp4
+#The daterange should be after me!
+#EXT-X-DATERANGE:ID="foo",START-DATE=2012-12-25T14:12:34.123Z,FOO="quoted-string here",BAR=0xABC123,BAZ=1.234
 #EXT-X-BYTERANGE:44556@8353216
 hls_450k_video.ts
 #EXT-X-ENDLIST`;
 
-const obj1 = m3u8NestedCodec.parse(test1);
-const obj2 = m3u8NestedCodec.parse(test2);
-// console.log(JSON.stringify(lineObjGroup(obj1), null, '  '));
-// console.log(JSON.stringify(lineObjGroup(obj2), null, '  '));
-// console.log('<<', obj);
+const obj1 = videojsCodec.parse(test1);
+const obj2 = videojsCodec.parse(test2);
 console.log(JSON.stringify(obj1, null, '  '));
 console.log(JSON.stringify(obj2, null, '  '));
-// const out1 = obj1.map(manifestPlaylistCodec.stringify).join('\n');
-// const out2 = obj2.map(mediaPlaylistCodec.stringify).join('\n');
-// console.log('>>', out1);
-// console.log('>>', out2);
+// console.log(JSON.stringify(obj1, null, '  '), '\n');
+// console.log(JSON.stringify(obj2, null, '  '), '\n');
+// const out1 =  m3u8NestedCodec.stringify(obj1);
+// const out2 = m3u8NestedCodec.stringify(obj2);
+// console.log('>>', out1, '\n');
+// console.log('>>', out2, '\n');
 // console.log(test1 === out);

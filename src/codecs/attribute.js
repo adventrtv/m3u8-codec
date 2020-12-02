@@ -12,13 +12,13 @@ const attributeCodecFactory = (typeContext) => {
         }
 
         // get attribute name
-        const attributeName = currentStr.slice(0, equalsOffset);
+        const attributeName = currentStr.slice(0, equalsOffset).trim();
 
         // str.slice(attribute name length)
         currentStr = currentStr.slice(equalsOffset + 1);
 
         // look-up type
-        const attributeType = typeContext.attributes.get(attributeName);
+        let attributeType = typeContext.attributes.get(attributeName) || typeContext.attributes.get('UNKNOWN-ATTRIBUTE');
 
         if (!attributeType) {
           throw new Error(`Attribute "${attributeName}" not allowed on tag "${typeContext.name}".`);
@@ -41,17 +41,17 @@ const attributeCodecFactory = (typeContext) => {
         return output;
       }
 
-      const attributeNames = Object.keys(attributes);
-      const attributeStrings = attributeNames.map((attributeName) => {
-        const attributeValue = attributes[attributeName];
+      const attributeProperties = Object.keys(attributes);
+      const attributeStrings = attributeProperties.map((attributeProperty) => {
+        const attributeValue = attributes[attributeProperty];
         // look-up type
-        const attributeType = typeContext.attributes.get(attributeName);
+        const attributeType = typeContext.attributes.get(attributeValue.name);
 
         if (!attributeType) {
-          throw new Error(`Attribute "${attributeName}" not allowed on tag "${typeContext.name}".`);
+          throw new Error(`Attribute "${attributeProperty}" not allowed on tag "${typeContext.name}".`);
         }
 
-        return attributeName + '=' + attributeType.stringify(output, attributeValue);
+        return attributeProperty + '=' + attributeType.stringify(output, attributeValue);
       });
 
       return output + attributeStrings.join(',');

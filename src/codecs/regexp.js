@@ -4,15 +4,13 @@
 export const makeRegexCodec = (regexp, stringify) => {
   return {
     parse: (str) => str.match(regexp),
-    stringify: (obj) => stringify(obj)
+    stringify
   };
 };
 
 const singleMatchToString = (matches) => `${matches[1]}`;
 
 const singleMatchToQuotedString = (matches) => `"${matches[1]}"`;
-
-const dateToString = (matches) => matches[1].toISOString();
 
 const resolutionToString = (matches) => `${matches[1]}x${matches[2]}`;
 
@@ -27,15 +25,52 @@ const durationToString = (matches) => {
 // Somewhat generic types that are used to more specific HLS-type parsers below
 export const predefinedTypes = {
   'integer': makeRegexCodec(/^([0-9]{1,20})/, singleMatchToString),
-  'unsigned-floating-point': makeRegexCodec(/^([0-9]+.?[0-9]*)/, singleMatchToString),
-  'signed-floating-point': makeRegexCodec(/^([-+]?[0-9]+.?[0-9]*)/, singleMatchToString),
+  'unsigned-floating-point': makeRegexCodec(/^([0-9]+\.?[0-9]*)/, singleMatchToString),
+  'signed-floating-point': makeRegexCodec(/^([-+]?[0-9]+\.?[0-9]*)/, singleMatchToString),
   'hexadecimal-string': makeRegexCodec(/^(0[xX][0-9A-Fa-f]+)/, singleMatchToString),
   'quoted-string': makeRegexCodec(/^"([^\n"]*)"/, singleMatchToQuotedString),
   'everything-to-newline': makeRegexCodec(/^([^\n]*)/, singleMatchToString),
-  'date-time': makeRegexCodec(/^(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?(?:(?:[+-]\d\d:\d\d)|Z))/, dateToString),
+  'date-time': makeRegexCodec(/^(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?(?:(?:[+-]\d\d:\d\d)|Z))/, singleMatchToString),
   'enumerated-string': makeRegexCodec(/^([^\s,"]+)/, singleMatchToString),
   'resolution': makeRegexCodec(/^([1-9][0-9]*)[xX]([1-9][0-9]*)/, resolutionToString),
   'byterange': makeRegexCodec(/^([0-9]+)@?([0-9]*)/, byteRangeToString),
-  'floating-point-duration': makeRegexCodec(/^([0-9]+.?[0-9]*),([^\n]*)/, durationToString),
+  'quoted-byterange': makeRegexCodec(/^"([0-9]+)@?([0-9]*)"/, byteRangeToString),
+  'floating-point-duration': makeRegexCodec(/^([0-9]+.?[0-9]*),?([^\n]*)/, durationToString),
   'integer-duration': makeRegexCodec(/^([0-9]+),([^\n]*)/, durationToString)
 };
+
+// So the anything codec will look at the next few characters
+// and if matches (in order):
+// `"` - use the `quoted-string` codec
+// `0x` - use the `hexadecimal-string` codec
+// ...otherwise use a `decimal-floating-point` codec
+const anythingCodec = {
+  parse: (str) => {
+    let type = 'quoted-string';
+    let matches = predefinedTypes[type].parse(str);
+
+    if (!matches) {
+      type = 'hexadecimal-string';
+      matches = predefinedTypes[type].parse(str);
+    }
+
+    if (!matches) {
+      type = 'unsigned-floating-point'
+      matches = predefinedTypes[type].parse(str);
+    }
+
+    if (matches) {
+      matches[2] = type;
+    }
+
+    return matches;
+  },
+  stringify: (matches) => {
+    if (matches[2] === 'quoted-string') {
+      return singleMatchToQuotedString(matches);
+    }
+    return singleMatchToString(matches);
+  }
+};
+
+predefinedTypes['might-be-any-type'] = anythingCodec;

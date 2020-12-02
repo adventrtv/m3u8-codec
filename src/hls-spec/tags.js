@@ -107,7 +107,7 @@ const tagSpec = [
       },
       {
         name: 'BYTERANGE',
-        type: '<decimal-byterange>',
+        type: '<quoted-decimal-byterange>',
         description: 'The value is a quoted-string specifying a byte range into the resource identified by the URI attribute. This attribute is OPTIONAL; if it is not present, the byte range is the entire resource indicated by the URI.'
       }
     ],
@@ -120,6 +120,7 @@ const tagSpec = [
     name: '#EXT-X-PROGRAM-DATE-TIME',
     type: '<date-time-msec>',
     playlistType: 'media',
+    appliesToNextUri: true,
     description: 'The EXT-X-PROGRAM-DATE-TIME tag associates the first sample of a Media Segment with an absolute date and/or time.  It applies only to the next Media Segment.'
   },
 
@@ -249,6 +250,7 @@ const tagSpec = [
       'YES',
       'NO'
     ],
+    default: 'YES',
     maxVersion: 6,
     playlistType: 'media',
     description: 'The EXT-X-ALLOW-CACHE tag indicates whether the client MAY or MUST NOT cache downloaded media segments for later replay.  It MAY occur anywhere in the Playlist file; it MUST NOT occur more than once.  The EXT-X-ALLOW-CACHE tag applies to all segments in the playlist.'
@@ -326,7 +328,6 @@ const tagSpec = [
           'YES',
           'NO'
         ],
-        default: 'NO',
         description: 'A value of YES indicates that the Rendition contains content that is considered essential to play.  When selecting a FORCED Rendition, a client SHOULD choose the one that best matches the current playback environment (e.g., language).  A value of NO indicates that the Rendition contains content that is intended to be played in response to explicit user request.'
       },
       {
@@ -564,7 +565,8 @@ const tagSpec = [
         description: 'The value is a quoted-string containing one or more positive integers separated by the "/" character (for example, "1", "1/2", or "1/2/5").  If more than one version of a particular KEYFORMAT is defined, this attribute can be used to indicate which version(s) this instance complies with.'
       }
     ],
-    playlistType: 'manifest'
+    playlistType: 'manifest',
+    description: 'The EXT-X-SESSION-KEY tag allows encryption keys from Media Playlists to be specified in a Master Playlist.  This allows the client to preload these keys without having to read the Media Playlist(s) first.'
   },
 
   // BOTH

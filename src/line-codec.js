@@ -94,6 +94,8 @@ const generateTagMapElement = (typeSpec) => {
 
       tagObject.attributes = new Map(attrTypes.map(mapAttributes));
 
+      tagObject.attributes.set.apply(tagObject.attributes, attributeElementGenerator(tagType)({name: 'UNKNOWN-ATTRIBUTE', type: '<unknown-type>'}));
+
       const attrs = tagObject.attributes;
 
       tagObject.setCustomAttribute = (newAttributeSpec) => attrs.set.apply(attrs, attributeElementGenerator(newAttributeSpec));
@@ -122,7 +124,11 @@ const buildCodec = (mainTagSpec, mainTypeSpec) => {
     const tagSpec = tagSpecMap.get(tagName);
 
     if (!tagSpec) {
-      throw new Error(`Found unknown tag "${tagName}".`);
+      return {
+        lineType: 'comment',
+        value: input
+      };
+      // throw new Error(`Found unknown tag "${tagName}".`);
     }
 
     const output = tagSpec.createInstance();
@@ -139,6 +145,8 @@ const buildCodec = (mainTagSpec, mainTypeSpec) => {
     if (tagValue !== '') {
       tagSpec.parse(output, tagValue);
     }
+
+    output.lineType = 'tag';
 
     return output;
   };
@@ -172,19 +180,15 @@ const buildCodec = (mainTagSpec, mainTypeSpec) => {
 
   return {
     parse: (lineStr) => {
-      if (lineStr.indexOf('#EXT') === 0) {
+      if (lineStr.indexOf('#') === 0) {
         // Found a tag!
-        const lineObj = parseTag(lineStr);
-
-        lineObj.lineType = 'tag';
-
-        return lineObj;
-      } else if (lineStr.indexOf('#') === 0) {
+        return parseTag(lineStr);
+/*      } else if (lineStr.indexOf('#') === 0) {
         // Found a comment!
         return {
           lineType: 'comment',
           value: lineStr
-        };
+        };*/
       } else if (lineStr.length === 0) {
         // Empty line
         return {

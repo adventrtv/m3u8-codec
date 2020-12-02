@@ -1,12 +1,17 @@
 import QUnit from 'qunit';
 import sinon from 'sinon';
 
+import videojsCodec from '../src/videojs.js';
+
 import makeLineCodec from '../src/line-codec.js';
 import { tagSpec, typeSpec } from '../src/hls-spec.js';
 
 // imports to help me build a new "type"
 import makeValueCodecFactory from '../src/codecs/value.js';
 import { makeRegexCodec } from '../src/codecs/regexp.js';
+
+import testDataExpected from './dist/test-expected.js';
+import testDataManifests from './dist/test-manifests.js';
 
 const onlyMediaTags = tagSpec.filter((tag) => tag.playlistType !== 'manifest');
 const onlyManifestTags = tagSpec.filter((tag) => tag.playlistType !== 'media');
@@ -130,4 +135,28 @@ QUnit.module('Line-Codec', () => {
     });
   });
 
+});
+
+QUnit.module('m3u8s');
+
+QUnit.test('parses static manifests as expected', function(assert) {
+  let key;
+
+  for (key in testDataManifests) {
+    if (testDataExpected[key]) {
+      console.log('>>', key);
+      if (/invalid|empty|missing/i.test(key)) {
+        assert.throws(()=> {
+          const manifest = videojsCodec.parse(testDataManifests[key]);
+        });
+      } else {
+        const manifest = videojsCodec.parse(testDataManifests[key]);
+        assert.deepEqual(
+          manifest,
+          testDataExpected[key],
+          key + '.m3u8 was parsed correctly'
+        );
+      }
+    }
+  }
 });
