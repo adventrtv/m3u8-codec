@@ -109,6 +109,12 @@ const typedCodecFactories = {
     ['value']
   ),
 
+  '<quoted-enumerated-string>': makeValueCodecFactory(
+    predefinedTypes['quoted-enumerated-string'],
+    [validateEnum],
+    ['value']
+  ),
+
   '<enumerated-string>': makeValueCodecFactory(
     predefinedTypes['enumerated-string'],
     [validateEnum],

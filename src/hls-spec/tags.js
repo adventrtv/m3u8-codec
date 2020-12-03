@@ -332,7 +332,7 @@ const tagSpec = [
       },
       {
         name: 'INSTREAM-ID',
-        type: '<enumerated-string>',
+        type: '<quoted-enumerated-string>',
         required: (ctx) => ctx.TYPE === 'CLOSED-CAPTIONS',
         allowed: (ctx) => ctx.TYPE === 'CLOSED-CAPTIONS',
         enum: [

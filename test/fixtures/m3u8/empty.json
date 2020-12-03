@@ -1,5 +1,7 @@
 {
   "allowCache": true,
   "discontinuityStarts": [],
-  "segments": []
+  "segments": [],
+  "mediaSequence": 0,
+  "discontinuitySequence": 0
 }

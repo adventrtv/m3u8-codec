@@ -1,9 +1,9 @@
 import QUnit from 'qunit';
 import sinon from 'sinon';
 
-import videojsCodec from '../src/videojs.js';
+import VideojsCodec from '../src/videojs.js';
 
-import makeLineCodec from '../src/line-codec.js';
+import LineCodec from '../src/line-codec.js';
 import { tagSpec, typeSpec } from '../src/hls-spec.js';
 
 // imports to help me build a new "type"
@@ -29,7 +29,7 @@ QUnit.module('Line-Codec', () => {
       ];
     },
     beforeEach() {
-      this.lineCodec = makeLineCodec(this.simpleTag, null);
+      this.lineCodec = new LineCodec(this.simpleTag, null);
     }
   }, () => {
     QUnit.test('TAG is parsed correctly', function(assert) {
@@ -49,8 +49,9 @@ QUnit.module('Line-Codec', () => {
       assert.throws(() => this.lineCodec.parse('#EXT-TAG:foo'),  /Tag "[^"]+" has no value but found "[^"]+"./);
     });
 
-    QUnit.test('Unknown TAGS trigger an error', function(assert) {
-      assert.throws(() => this.lineCodec.parse('#EXT-FOO'), /Found unknown tag "[^"]+"./);
+    QUnit.test('Unknown TAGS are treated as comments', function(assert) {
+      const output = this.lineCodec.parse('#EXT-FOO');
+      assert.deepEqual(output, {lineType: 'comment', value:'#EXT-FOO'});
     });
 
     QUnit.test('Lines starting with a # but not #EXT are interpreted as comments', function(assert) {
@@ -99,7 +100,7 @@ QUnit.module('Line-Codec', () => {
       };
     },
     beforeEach() {
-      this.lineCodec = makeLineCodec(this.stringValueTag, this.stringValueType);
+      this.lineCodec = new LineCodec(this.stringValueTag, this.stringValueType);
     }
   }, () => {
     QUnit.test('TAG is parsed correctly', function(assert) {
@@ -119,44 +120,69 @@ QUnit.module('Line-Codec', () => {
       assert.throws(() => this.lineCodec.parse('#EXT-TAG'), /Tag "[^"]+" has a value but none were found./);
     });
 
-    QUnit.test('Unknown TAGS trigger an error', function(assert) {
-      assert.throws(() => this.lineCodec.parse('#EXT-FOO'), /Found unknown tag "[^"]+"./);
+    QUnit.test('Unknown TAGS are treated as comments', function(assert) {
+      const output = this.lineCodec.parse('#EXT-FOO');
+      assert.deepEqual(output, {lineType: 'comment', value:'#EXT-FOO'});
     });
 
     QUnit.test('Custom TAG types can be added after codec initialization', function(assert) {
       this.lineCodec.setCustomTag({
         name: '#EXT-FOO',
         type: 'bar'
-      }, { number: this.stringValueType.string });
+      }, { bar: this.stringValueType.string });
 
       const data = this.lineCodec.parse('#EXT-FOO:123');
 
       assert.deepEqual(data, {name: '#EXT-FOO', type: 'bar', value: '123', lineType: 'tag'});
     });
   });
-
 });
 
-QUnit.module('m3u8s');
+QUnit.module('Fixtures', {
+  before() {
+    this.videojsCodec = new VideojsCodec();
+  }
+}, () => {
+  const keys = Object.keys(testDataManifests);
+  const positiveTests = [];
+  const negativeTests = [];
 
-QUnit.test('parses static manifests as expected', function(assert) {
-  let key;
+  keys.forEach((key) => {
+    if (!testDataExpected[key]) {
+      return;
+    }
+    if (/invalid|empty\w|negative/i.test(key)) {
+      negativeTests.push(key);
+    } else {
+      positiveTests.push(key);
+    }
+  });
 
-  for (key in testDataManifests) {
-    if (testDataExpected[key]) {
-      console.log('>>', key);
-      if (/invalid|empty|missing/i.test(key)) {
-        assert.throws(()=> {
-          const manifest = videojsCodec.parse(testDataManifests[key]);
-        });
-      } else {
-        const manifest = videojsCodec.parse(testDataManifests[key]);
+  QUnit.module('Positive Tests', () => {
+    positiveTests.forEach((key) => {
+      const manifest = testDataManifests[key];
+      const expected = testDataExpected[key];
+
+      QUnit.test(`${key}.m3u8`, function(assert) {
+        const output = this.videojsCodec.parse(manifest);
         assert.deepEqual(
-          manifest,
-          testDataExpected[key],
+          output,
+          expected,
           key + '.m3u8 was parsed correctly'
         );
-      }
-    }
-  }
+      });
+    });
+  });
+
+  QUnit.module('Negative Tests', () => {
+    negativeTests.forEach((key) => {
+      const manifest = testDataManifests[key];
+
+      QUnit.test(`${key}.m3u8`, function(assert) {
+        assert.throws(()=> {
+          this.videojsCodec.parse(manifest);
+        }, key + '.m3u8 failed correctly');
+      });
+    });
+  })
 });

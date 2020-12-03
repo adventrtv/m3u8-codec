@@ -1,4 +1,4 @@
-import m3u8Codec from './m3u8.js';
+import M3u8Codec from './m3u8.js';
 
 const groupPlaylistObject = (hlsObject) => {
   const groupLocation = hlsObject.playlistType === 'manifest' ? 'playlists': 'segments';
@@ -67,20 +67,22 @@ const ungroupPlaylistObject = (hlsObject) => {
   return hlsObject.globals.concat(group.flat());
 }
 
-export default {
-  parse: (m3u8Data) => {
-    const hlsObject = m3u8Codec.parse(m3u8Data);
+export default class M3u8NestedCodec extends M3u8Codec {
+  constructor (mainTagSpec, mainTypeSpec) {
+    super(mainTagSpec, mainTypeSpec);
+  }
+
+  parse(m3u8Data) {
+    const hlsObject = super.parse(m3u8Data);
     const nestedHlsObject = groupPlaylistObject(hlsObject);
 
     return nestedHlsObject;
-  },
-  stringify: (nestedHlsObject) => {
+  }
+
+  stringify(nestedHlsObject) {
     const hlsObject = ungroupPlaylistObject(nestedHlsObject);
-    const m3u8Data = m3u8Codec.stringify(hlsObject);
+    const m3u8Data = super.stringify(hlsObject);
 
     return m3u8Data;
-  },
-  setCustomTag: m3u8Codec.setCustomTag,
-  setCustomType: m3u8Codec.setCustomType,
-  getTag: m3u8Codec.getTag
+  }
 };

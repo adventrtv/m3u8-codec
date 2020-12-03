@@ -1,4 +1,4 @@
-import m3u8NestedCodec from './m3u8-nested.js';
+import M3u8NestedCodec from './m3u8-nested.js';
 import { setProperty, getProperty } from './helpers/props.js';
 
 const gatherGlobalTags = (globals) => {
@@ -31,13 +31,18 @@ const gatherGlobalTags = (globals) => {
     case '#EXT-X-I-FRAMES-ONLY':
       // TODO: figure out how to handle this one
       break;
+    case '#EXT-X-START':
+      output.start = {
+        timeOffset: tag.value['TIME-OFFSET'].value,
+        precise: tag.value.PRECISE?.value === 'YES'
+      };
     }
   });
 
   return output;
 };
 
-const mediaGroupAttr = ['DEFAULT', 'AUTOSELECT', 'FORCED', 'LANGUAGE', 'URI'];
+const mediaGroupAttr = ['DEFAULT', 'AUTOSELECT', 'FORCED', 'LANGUAGE', 'URI', 'INSTREAM-ID'];
 const booleanAttr = ['DEFAULT', 'AUTOSELECT', 'FORCED'];
 const camelCaseIt = (str) => str.toLowerCase().replace(/-([a-z])/g, (m) => m[1].toUpperCase());
 const buildMediaGroups = (videojsObj, globals) => {
@@ -71,6 +76,8 @@ const buildMediaGroups = (videojsObj, globals) => {
   });
 };
 
+const dumbStringProperties = ['AVERAGE-BANDWIDTH', 'FRAME-RATE'];
+
 const buildPlaylists = (videojsObj, playlists) => {
   videojsObj.playlists = videojsObj.playlists || [];
 
@@ -93,7 +100,11 @@ const buildPlaylists = (videojsObj, playlists) => {
 
         currentObj.attributes = {};
         valueProperties.forEach((valueProperty) => {
-          currentObj.attributes[valueProperty] = tag.value[valueProperty].value;
+          if (dumbStringProperties.indexOf(valueProperty) !== -1) {
+            currentObj.attributes[valueProperty] = tag.value[valueProperty].value + '';
+          } else {
+            currentObj.attributes[valueProperty] = tag.value[valueProperty].value;
+          }
         });
       }
       // TODO: Support EXT-X-I-FRAME-STREAM-INF
@@ -103,7 +114,25 @@ const buildPlaylists = (videojsObj, playlists) => {
   });
 };
 
+const isBigEndian = () => {
+  const arrayBuffer = new ArrayBuffer(2);
+  const uint8Array = new Uint8Array(arrayBuffer);
+  const uint16array = new Uint16Array(arrayBuffer);
+
+  uint8Array[0] = 0xAA; // set first byte
+  uint8Array[1] = 0xBB; // set second byte
+
+  if (uint16array[0] === 0xAABB) {
+    return true;
+  }
+  return false;
+};
+
 const switchEndianness = (buffer) => {
+  if (isBigEndian()) {
+    return buffer;
+  }
+
   const bytes = new Uint8Array(buffer);
   const len = bytes.length;
   const output = new Uint8Array(len);
@@ -116,7 +145,7 @@ const switchEndianness = (buffer) => {
   }
 
   return output.buffer;
-}
+};
 
 const buildSegments = (videojsObj, segments) => {
   videojsObj.segments = videojsObj.segments || [];
@@ -142,6 +171,7 @@ const buildSegments = (videojsObj, segments) => {
     if (last && last.map) {
       currentObj.map = last.map;
     }
+    currentObj.duration = videojsObj.targetDuration;
 
     segmentArr.forEach((tag) => {
       if (tag.lineType === 'uri') {
@@ -149,10 +179,12 @@ const buildSegments = (videojsObj, segments) => {
       } else if (tag.lineType === 'tag'){
         switch (tag.name) {
         case '#EXTINF':
-          currentObj.duration = tag.value.duration;
-          if (tag.value.title && tag.value.title.length) {
-            currentObj.title = tag.value.title;
+          if (!isNaN(tag.value.duration)) {
+            currentObj.duration = tag.value.duration;
           }
+          // if (tag.value.title && tag.value.title.length) {
+          //   currentObj.title = tag.value.title;
+          // }
           break;
         case '#EXT-X-BYTERANGE':
           currentObj.byterange = tag.value;
@@ -210,9 +242,13 @@ const buildSegments = (videojsObj, segments) => {
   });
 };
 
-export default {
-  parse: (m3u8Data) => {
-    const hlsObject = m3u8NestedCodec.parse(m3u8Data);
+export default class VideojsCodec extends M3u8NestedCodec {
+  constructor (mainTagSpec, mainTypeSpec) {
+    super(mainTagSpec, mainTypeSpec);
+  }
+
+  parse(m3u8Data) {
+    const hlsObject = super.parse(m3u8Data);
 
     const videojsObj = gatherGlobalTags(hlsObject.globals);
 
@@ -224,13 +260,11 @@ export default {
     }
 
     return videojsObj;
-  },
-  stringify: (nestedHlsObject) => {
-    const m3u8Data = m3u8NestedCodec.stringify(nestedHlsObject);
+  }
+
+  stringify(nestedHlsObject) {
+    const m3u8Data = super.stringify(nestedHlsObject);
 
     return m3u8Data;
-  },
-  setCustomTag: m3u8NestedCodec.setCustomTag,
-  setCustomType: m3u8NestedCodec.setCustomType,
-  getTag: m3u8NestedCodec.getTag
+  }
 };

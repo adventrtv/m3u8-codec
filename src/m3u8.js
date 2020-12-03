@@ -1,7 +1,5 @@
-import makeLineCodec from './line-codec.js';
-import { tagSpec, typeSpec } from './hls-spec.js';
-
-const lineCodec = makeLineCodec(tagSpec, typeSpec);
+import LineCodec from './line-codec.js';
+import { tagSpec } from './hls-spec.js';
 
 const detectPlaylistType = (arr) => {
   const {manifest, media} = arr.reduce((results, line) => {
@@ -51,22 +49,24 @@ const addDefaults = (hlsObject) => {
   return hlsObject;
 };
 
-export default {
-  parse: (m3u8Data) => {
+export default class M3u8Codec extends LineCodec {
+  constructor (mainTagSpec, mainTypeSpec) {
+    super(mainTagSpec, mainTypeSpec);
+  }
+
+  parse(m3u8Data) {
     const lines = m3u8Data.split('\n');
-    const hlsObject = lines.map(lineCodec.parse);
+    const hlsObject = lines.map((l) => super.parse(l));
 
     hlsObject.playlistType = detectPlaylistType(hlsObject);
 
     return addDefaults(hlsObject);
-  },
-  stringify: (hlsObject) => {
-    const lines = hlsObject.map(lineCodec.stringify);
+  }
+
+  stringify(hlsObject) {
+    const lines = hlsObject.map((o) => super.stringify(o));
     const m3u8Data = lines.join('\n');
 
     return m3u8Data;
-  },
-  setCustomTag: lineCodec.setCustomTag,
-  setCustomType: lineCodec.setCustomType,
-  getTag: lineCodec.getTag
+  }
 };

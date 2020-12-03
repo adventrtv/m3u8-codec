@@ -31,10 +31,11 @@ export const predefinedTypes = {
   'quoted-string': makeRegexCodec(/^"([^\n"]*)"/, singleMatchToQuotedString),
   'everything-to-newline': makeRegexCodec(/^([^\n]*)/, singleMatchToString),
   'date-time': makeRegexCodec(/^(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?(?:(?:[+-]\d\d:\d\d)|Z))/, singleMatchToString),
+  'quoted-enumerated-string': makeRegexCodec(/^"([^\n"]+)"/, singleMatchToQuotedString),
   'enumerated-string': makeRegexCodec(/^([^\s,"]+)/, singleMatchToString),
   'resolution': makeRegexCodec(/^([1-9][0-9]*)[xX]([1-9][0-9]*)/, resolutionToString),
   'byterange': makeRegexCodec(/^([0-9]+)@?([0-9]*)/, byteRangeToString),
-  'quoted-byterange': makeRegexCodec(/^"([0-9]+)@?([0-9]*)"/, byteRangeToString),
+  'quoted-byterange': makeRegexCodec(/^"([0-9]+)@?([0-9]*)"/, singleMatchToQuotedString),
   'floating-point-duration': makeRegexCodec(/^([0-9]+.?[0-9]*),?([^\n]*)/, durationToString),
   'integer-duration': makeRegexCodec(/^([0-9]+),([^\n]*)/, durationToString)
 };

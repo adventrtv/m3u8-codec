@@ -1,3 +1,5 @@
+import { tagSpec, typeSpec } from './hls-spec.js';
+
 // Build a new instance of tag
 // Tags copy most of the properties from the tagSpec but are missing the
 // parse and stringify functions AND attribute specs
@@ -105,6 +107,128 @@ const generateTagMapElement = (typeSpec) => {
   };
 };
 
+export default class LineCodec {
+  #localTypeSpec;
+  #defaultTagMapElementGenerator;
+  #tagSpecMap;
+  #parseTag;
+  #serializeTag;
+
+  constructor (mainTagSpec = tagSpec, mainTypeSpec = typeSpec) {
+    this.#localTypeSpec = Object.create(mainTypeSpec);
+    this.#defaultTagMapElementGenerator = generateTagMapElement(this.#localTypeSpec);
+    // Build O(1) lookup table(s) from spec
+    this.#tagSpecMap = new Map(mainTagSpec.map(this.#defaultTagMapElementGenerator));
+
+    this.#parseTag = (input) => {
+      let tagName = input;
+      const firstColon = input.indexOf(':');
+      let tagValue = '';
+
+      if (firstColon !== -1) {
+        tagName = input.slice(0, firstColon);
+        tagValue = input.slice(firstColon + 1);
+      }
+
+      const tagSpec = this.#tagSpecMap.get(tagName);
+
+      if (!tagSpec) {
+        return {
+          lineType: 'comment',
+          value: input
+        };
+        // throw new Error(`Found unknown tag "${tagName}".`);
+      }
+
+      const output = tagSpec.createInstance();
+
+      // TODO: Stop special-casing type null?
+      if (tagSpec.type === null && tagValue !== '') {
+        throw new Error(`Tag "${tagSpec.name}" has no value but found "${tagValue}".`);
+      }
+
+      if (tagSpec.type !== null && tagValue === '') {
+        throw new Error(`Tag "${tagSpec.name}" has a value but none were found.`);
+      }
+
+      if (tagValue !== '') {
+        tagSpec.parse(output, tagValue);
+      }
+
+      output.lineType = 'tag';
+
+      return output;
+    };
+
+
+    this.#serializeTag = (lineObj) => {
+      const tagSpec = this.#tagSpecMap.get(lineObj.name);
+
+      // TODO: Stop special-casing type null?
+      if (tagSpec.type !== null) {
+        const valueString = tagSpec.stringify('', lineObj);
+
+        return `${lineObj.name}:${valueString}`;
+      }
+
+      return `${lineObj.name}`;
+    };
+  }
+
+  setCustomTag(newTagSpec, newTypeSpec = null) {
+    let localTagMapElementGenerator = this.#defaultTagMapElementGenerator;
+
+    if (newTypeSpec) {
+      localTagMapElementGenerator = generateTagMapElement(newTypeSpec);
+    }
+
+    this.#tagSpecMap.set.apply(this.#tagSpecMap, localTagMapElementGenerator(newTagSpec));
+  }
+
+  setCustomType (newTypeName, newTypeSpec) {
+    this.#localTypeSpec[newTypeName] = newTypeSpec;
+  }
+
+  getTag(tagName) {
+    return this.#tagSpecMap.get(tagName)
+  }
+
+  parse(lineStr) {
+    if (lineStr.indexOf('#') === 0) {
+      // Found a tag or comment!
+      return this.#parseTag(lineStr);
+    } else if (lineStr.trim().length === 0) {
+      // Empty line
+      return {
+        lineType: 'empty'
+      };
+    }
+    // URI!
+    return {
+      lineType: 'uri',
+      value: lineStr.trim()
+    };
+  }
+
+  stringify(lineObj) {
+    let str;
+
+    switch (lineObj.lineType) {
+    case 'tag':
+      str = this.#serializeTag(lineObj);
+      break;
+    case 'empty':
+      str = '';
+      break;
+    default:
+      str = lineObj.value;
+      break;
+    }
+
+    return str;
+  }
+};
+/*
 const buildCodec = (mainTagSpec, mainTypeSpec) => {
   const localTypeSpec = Object.create(mainTypeSpec);
   const defaultTagMapElementGenerator = generateTagMapElement(localTypeSpec);
@@ -183,13 +307,7 @@ const buildCodec = (mainTagSpec, mainTypeSpec) => {
       if (lineStr.indexOf('#') === 0) {
         // Found a tag!
         return parseTag(lineStr);
-/*      } else if (lineStr.indexOf('#') === 0) {
-        // Found a comment!
-        return {
-          lineType: 'comment',
-          value: lineStr
-        };*/
-      } else if (lineStr.length === 0) {
+      } else if (lineStr.trim().length === 0) {
         // Empty line
         return {
           lineType: 'empty'
@@ -198,7 +316,7 @@ const buildCodec = (mainTagSpec, mainTypeSpec) => {
       // URI!
       return {
         lineType: 'uri',
-        value: lineStr
+        value: lineStr.trim()
       };
     },
     stringify: (lineObj) => {
@@ -223,5 +341,4 @@ const buildCodec = (mainTagSpec, mainTypeSpec) => {
     setCustomType
   };
 };
-
-export default buildCodec;
+*/

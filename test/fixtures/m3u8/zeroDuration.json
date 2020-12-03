@@ -4,7 +4,7 @@
   "playlistType": "VOD",
   "segments": [
     {
-      "duration": 0.01,
+      "duration": 0.0,
       "timeline": 0,
       "uri": "http://example.com/00001.ts"
     }
