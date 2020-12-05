@@ -1,4 +1,2 @@
-import tagSpec from './hls-spec/tags.js';
-import typeSpec from './hls-spec/types.js';
-
-export { tagSpec, typeSpec };
+export tagSpec from './hls-spec/tags.js';
+export typeSpec from './hls-spec/types.js';

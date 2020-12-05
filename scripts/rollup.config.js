@@ -5,12 +5,15 @@ const generate = require('videojs-generate-rollup-config');
 const options = {
   input: 'src/index.js',
   babel(bOpts) {
-    bOpts.plugins.push(["@babel/plugin-proposal-class-properties", { "loose": true }]);
-    bOpts.plugins.push(["@babel/plugin-proposal-private-methods", { "loose": true }]);
-console.log(bOpts.plugins);
+    // Not sure if I need both but why not?
+    bOpts.plugins.push(["@babel/plugin-proposal-class-properties"/*, { "loose": true }*/]);
+    bOpts.plugins.push(["@babel/plugin-proposal-private-methods"/*, { "loose": true }*/]);
+    bOpts.plugins.push(["@babel/plugin-proposal-export-default-from"]);
+
     return bOpts;
   },
   plugins(pOpts) {
+    // Re-order babel and commonjs so that babel happens FIRST (to support experimental ES6 features)
     ['browser', 'modules', 'test'].forEach((env) => {
       if (!pOpts[env]) {
         return;
@@ -26,7 +29,7 @@ console.log(bOpts.plugins);
       pOpts[env].splice(babelIdx, 1);
       pOpts[env] = [pOpts[env].slice(0, commonjsIdx), 'babel', pOpts[env].slice(commonjsIdx)].flat();
     });
-    console.log(pOpts);
+
     return pOpts;
   }
 };
@@ -40,5 +43,3 @@ if (config.builds.test) {
 
 // export the builds to rollup
 export default Object.values(config.builds);
-
-//console.log(config.settings)

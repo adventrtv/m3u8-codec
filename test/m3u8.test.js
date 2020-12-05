@@ -10,9 +10,6 @@ import { tagSpec, typeSpec } from '../src/hls-spec.js';
 import makeValueCodecFactory from '../src/codecs/value.js';
 import { makeRegexCodec } from '../src/codecs/regexp.js';
 
-import testDataExpected from './dist/test-expected.js';
-import testDataManifests from './dist/test-manifests.js';
-
 const onlyMediaTags = tagSpec.filter((tag) => tag.playlistType !== 'manifest');
 const onlyManifestTags = tagSpec.filter((tag) => tag.playlistType !== 'media');
 
@@ -138,6 +135,52 @@ QUnit.module('Line-Codec', () => {
   });
 });
 
+import testDataExpected from './dist/test-expected.js';
+import testDataManifests from './dist/test-manifests.js';
+
+// This asserts that all the properties in the expected object are
+// present in the actual but actual can contain ADDITIONAL properties
+QUnit.assert.deepEqualWithExtra = function (actual, expected, message, child = false) {
+  const mustHaveKeys = Object.keys(expected);
+
+  for (let i = 0; i < mustHaveKeys.length; i++) {
+    const key = mustHaveKeys[i];
+    if (typeof expected[key] === 'object') {
+      const result = QUnit.assert.deepEqualWithExtra(actual[key], expected[key], message, true);
+      if (!result) {
+        if(child) {
+          return false;
+        } else {
+          return this.pushResult({
+            result: false,
+            actual: actual,
+            expected: expected,
+            message: message
+          });
+        }
+      }
+    } else if (actual[key] !== expected[key]) {
+      if (child) {
+        return false;
+      } else {
+        return this.pushResult({
+          result: false,
+          actual: actual,
+          expected: expected,
+          message: message
+        });
+      }
+    }
+  }
+  this.pushResult({
+    result: true,
+    actual: actual,
+    expected: expected,
+    message: message
+  });
+  return true;
+};
+
 QUnit.module('Fixtures', {
   before() {
     this.videojsCodec = new VideojsCodec();
@@ -165,7 +208,7 @@ QUnit.module('Fixtures', {
 
       QUnit.test(`${key}.m3u8`, function(assert) {
         const output = this.videojsCodec.parse(manifest);
-        assert.deepEqual(
+        assert.deepEqualWithExtra(
           output,
           expected,
           key + '.m3u8 was parsed correctly'

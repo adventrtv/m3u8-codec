@@ -1,4 +1,4 @@
-const { m3u8Codec, m3u8NestedCodec, videojsCodec } = require('../');
+const { VideojsCodec, M3u8NestedCodec } = require('../');
 
 /*
 import { tagSpec, typeSpec } from './src/hls-spec.js';
@@ -108,14 +108,20 @@ main.mp4
 hls_450k_video.ts
 #EXT-X-ENDLIST`;
 
-const obj1 = videojsCodec.parse(test1);
-const obj2 = videojsCodec.parse(test2);
-console.log(JSON.stringify(obj1, null, '  '));
-console.log(JSON.stringify(obj2, null, '  '));
-// console.log(JSON.stringify(obj1, null, '  '), '\n');
-// console.log(JSON.stringify(obj2, null, '  '), '\n');
-// const out1 =  m3u8NestedCodec.stringify(obj1);
-// const out2 = m3u8NestedCodec.stringify(obj2);
-// console.log('>>', out1, '\n');
-// console.log('>>', out2, '\n');
-// console.log(test1 === out);
+const codec = new VideojsCodec;
+
+const obj1 = codec.parse(test1);
+const obj2 = codec.parse(test2);
+console.log(JSON.stringify(obj1, null, '  '), '\n');
+console.log(JSON.stringify(obj2, null, '  '), '\n');
+const out1 = codec.stringify(obj1);
+const out2 = codec.stringify(obj2);
+console.log('>>', out1, '\n');
+console.log('>>', out2, '\n');
+
+console.log(test1, '\n>>', JSON.stringify(obj1, null, '  '), '\n>>', out1);
+console.log('\n\n');
+console.log(test2, '\n>>', JSON.stringify(obj2, null, '  '), '\n>>', out2);
+
+// console.log(test1 === out1);
+// console.log(test2 === out2);

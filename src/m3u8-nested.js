@@ -54,10 +54,6 @@ const groupPlaylistObject = (hlsObject) => {
     groupedLines[groupLocation].push(group);
   });
 
-  // todo:
-  //   spread media-sequence?
-  //   spread discontinuity-sequence?
-
   return groupedLines;
 };
 

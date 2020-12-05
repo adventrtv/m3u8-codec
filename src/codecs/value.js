@@ -1,72 +1,62 @@
-import { identity } from './type-casts.js';
 import { setProperty, getProperty } from '../helpers/props.js';
 
-const makeValueCodecFactory = (typeRegexpCodec, casterArray = [identity], namedCaptureArray = ['value']) => {
-  const capturePropertyPaths = namedCaptureArray.map(c => c.split('.'));
+// Usage:
+// class Foo extends NamedCaptureMixin(FuzzyType, [integer], ['value']) {};
+export const NamedCaptureMixin = (Type, typeCastsArray, captureNamesArray) => class extends Type {
+  #capturePropertyPaths = captureNamesArray.map(c => c.split('.'));
+  #casterArray = typeCastsArray;
+  #typeContext;
 
-  if (!typeRegexpCodec) {
-    throw new Error('The "typeRegexpCodec" argument must not be undefined.');
+  constructor(typeContext) {
+    super();
+    this.#typeContext = typeContext;
   }
 
-  if (!Array.isArray(casterArray) || !Array.isArray(namedCaptureArray) || casterArray.length !== namedCaptureArray.length) {
-    throw new Error('The arguments "casterArray" and "namedCaptureArray" must be arrays with the same length.');
-  }
+  parse(output, str) {
+    const matches = super.parse(str);
 
-  return (typeContext) => {
-    return {
-      parse: (output, str) => {
-        const allMatches = typeRegexpCodec.parse(str);
+    if (!matches || matches.length < 1) {
+      throw new Error(`Error parsing type "${this.typeContext.type}" from string "${str}".`);
+    }
+    const consumedChars = matches.consumedChars;
 
-        if (!allMatches || allMatches.length < 2) {
-          throw new Error(`Error parsing type "${typeContext.type}" from string "${str}".`);
-        }
-
-        const consumedChars = allMatches[0].length;
-        const matches = allMatches.slice(1);
-
-        capturePropertyPaths.forEach((capturePropertyPath, index) => {
-          if (matches.length < index) {
-            return;
-          }
-
-          const match = matches[index];
-
-          if (match !== undefined) {
-            const matchCaster = casterArray[index];
-            const matchValue = matchCaster.toValue(typeContext, match, index, matches);
-
-            setProperty(output, capturePropertyPath, matchValue);
-          }
-        });
-
-        return consumedChars;
-      },
-      stringify: (output, obj) => {
-        const values = [];
-
-        capturePropertyPaths.forEach((capturePropertyPath, index) => {
-          const value = getProperty(obj, capturePropertyPath);
-
-
-          if (value !== null && value !== undefined) {
-            values[index] = value;
-          }
-        });
-
-        const matches = values.reduce((matches, match, index) => {
-          const matchCaster = casterArray[index];
-          matches[index] = matchCaster.fromValue(typeContext, match, index, values);
-          return matches;
-        }, []);
-
-        const stringifiedObj = typeRegexpCodec.stringify([null, ...matches]);
-
-        output += stringifiedObj;
-
-        return output;
+    // Each capture path defines where to place each capture group in the original regex
+    this.#capturePropertyPaths.forEach((capturePropertyPath, index) => {
+      if (matches.length < index) {
+        return;
       }
-    };
-  };
-};
+      const match = matches[index];
 
-export default makeValueCodecFactory;
+      if (match !== undefined) {
+        const matchCaster = this.#casterArray[index];
+        const matchValue = matchCaster.toValue(this.#typeContext, match, index, matches);
+
+        setProperty(output, capturePropertyPath, matchValue);
+      }
+    });
+
+    return consumedChars;
+  }
+
+  stringify(output, obj) {
+    const values = [];
+
+    this.#capturePropertyPaths.forEach((capturePropertyPath, index) => {
+      const value = getProperty(obj, capturePropertyPath);
+
+      if (value !== null && value !== undefined) {
+        values[index] = value;
+      }
+    });
+    const matches = values.reduce((matches, match, index) => {
+      const matchCaster = this.#casterArray[index];
+      matches[index] = matchCaster.fromValue(this.#typeContext, match, index, values);
+      return matches;
+    }, []);
+    const stringifiedObj = super.stringify(matches);
+
+    output += stringifiedObj;
+
+    return output;
+  }
+};

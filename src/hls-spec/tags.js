@@ -20,6 +20,7 @@ const tagSpec = [
     name: '#EXT-X-VERSION',
     type: '<decimal-integer>',
     playlistType: 'both',
+    default: 1,
     description: 'The EXT-X-VERSION tag indicates the compatibility version of the Playlist file, its associated media, and its server.  The EXT-X-VERSION tag applies to the entire Playlist file.'
   },
 

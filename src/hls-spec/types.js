@@ -1,19 +1,40 @@
-import { predefinedTypes } from '../codecs/regexp.js';
-import { identity, dateCast, validateEnum, numberCast, hexCast } from '../codecs/type-casts.js';
-import makeValueCodecFactory from '../codecs/value.js';
-import attributeCodecFactory from '../codecs/attribute.js';
+/* eslint dot-notation: 0 */
+import { NamedCaptureMixin } from '../codecs/value.js';
+import { AttributeType } from '../codecs/attribute.js';
+import {
+  IdentityType,
+  IntegerType,
+  UnsignedFloatingPointType,
+  SignedFloatingPointType,
+  HexadecimalSequenceType,
+  RemainingLineType,
+  DateTimeType,
+  EnumeratedType,
+  QuotedStringType,
+  ByteRangeType,
+  QuotedByteRangeType,
+  ResolutionType,
+  DurationType,
+  FuzzyType
+} from '../codecs/regexp.js';
 
-// Types specified in the HLS spec (plus a few convenient types _implied_ by the spec)
+import {
+  identity,
+  dateCast,
+  validateEnum,
+  numberCast,
+  hexCast
+} from '../codecs/type-casts.js';
 
 const dataTypeToHlsType = {
   toValue: (ctx, value, index, valuesArray) => {
     switch (value) {
-    case 'quoted-string':
+    case 'string':
       return '<quoted-string>';
-    case 'hexadecimal-string':
+    case 'hexadecimal':
       return '<hexadecimal-sequence>';
-    case 'unsigned-floating-point':
-      return '<decimal-floating-point>'
+    case 'number':
+      return '<decimal-signed-floating-point>';
     default:
       return null;
     }
@@ -21,11 +42,11 @@ const dataTypeToHlsType = {
   fromValue: (ctx, value, index, valuesArray) => {
     switch (value) {
     case '<quoted-string>':
-      return 'quoted-string';
+      return 'string';
     case '<hexadecimal-sequence>':
-      return 'hexadecimal-string';
-    case '<decimal-floating-point>':
-      return 'unsigned-floating-point'
+      return 'hexadecimal';
+    case '<decimal-signed-floating-point>':
+      return 'number';
     default:
       return null;
     }
@@ -35,11 +56,11 @@ const dataTypeToHlsType = {
 const typeSensitiveCast = {
   toValue: (ctx, value, index, valuesArray) => {
     switch (valuesArray[1]) {
-    case 'quoted-string':
+    case 'string':
       return identity.toValue(ctx, value, index, valuesArray);
-    case 'hexadecimal-string':
+    case 'hexadecimal':
       return hexCast.toValue(ctx, value, index, valuesArray);
-    case 'unsigned-floating-point':
+    case 'number':
       return numberCast.toValue(ctx, value, index, valuesArray);
     default:
       return null;
@@ -51,7 +72,7 @@ const typeSensitiveCast = {
       return identity.fromValue(ctx, value, index, valuesArray);
     case '<hexadecimal-sequence>':
       return hexCast.fromValue(ctx, value, index, valuesArray);
-    case '<decimal-floating-point>':
+    case '<decimal-signed-floating-point>':
       return numberCast.fromValue(ctx, value, index, valuesArray);
     default:
       return null;
@@ -59,105 +80,23 @@ const typeSensitiveCast = {
   }
 };
 
-/* eslint dot-notation: 0 */
-const typedCodecFactories = {
-  '<decimal-integer>': makeValueCodecFactory(
-    predefinedTypes['integer'],
-    [numberCast],
-    ['value']
-  ),
-
-  '<decimal-floating-point>': makeValueCodecFactory(
-    predefinedTypes['unsigned-floating-point'],
-    [numberCast],
-    ['value']
-  ),
-
-  '<signed-decimal-floating-point>': makeValueCodecFactory(
-    predefinedTypes['signed-floating-point'],
-    [numberCast],
-    ['value']
-  ),
-
-  '<hexadecimal-sequence>': makeValueCodecFactory(
-    predefinedTypes['hexadecimal-string'],
-    [hexCast],
-    ['value']
-  ),
-
-  '<quoted-string>': makeValueCodecFactory(
-    predefinedTypes['quoted-string'],
-    [identity],
-    ['value']
-  ),
-
-  '<unquoted-string>': makeValueCodecFactory(
-    predefinedTypes['everything-to-newline'],
-    [identity],
-    ['value']
-  ),
-
-  '<uri>': makeValueCodecFactory(
-    predefinedTypes['quoted-string'],
-    [identity],
-    ['value']
-  ),
-
-  '<date-time-msec>': makeValueCodecFactory(
-    predefinedTypes['date-time'],
-    [dateCast],
-    ['value']
-  ),
-
-  '<quoted-enumerated-string>': makeValueCodecFactory(
-    predefinedTypes['quoted-enumerated-string'],
-    [validateEnum],
-    ['value']
-  ),
-
-  '<enumerated-string>': makeValueCodecFactory(
-    predefinedTypes['enumerated-string'],
-    [validateEnum],
-    ['value']
-  ),
-
-  '<decimal-resolution>': makeValueCodecFactory(
-    predefinedTypes['resolution'],
-    [numberCast, numberCast],
-    ['value.width', 'value.height']
-  ),
-
-  '<decimal-byterange>': makeValueCodecFactory(
-    predefinedTypes['byterange'],
-    [numberCast, numberCast],
-    ['value.length', 'value.offset']
-  ),
-
-  '<quoted-decimal-byterange>': makeValueCodecFactory(
-    predefinedTypes['quoted-byterange'],
-    [numberCast, numberCast],
-    ['value.length', 'value.offset']
-  ),
-
-  '<decimal-floating-point-duration>': makeValueCodecFactory(
-    predefinedTypes['floating-point-duration'],
-    [numberCast, identity],
-    ['value.duration', 'value.title']
-  ),
-
-  '<decimal-integer-duration>': makeValueCodecFactory(
-    predefinedTypes['integer-duration'],
-    [numberCast, identity],
-    ['value.duration', 'value.title']
-  ),
-
-  '<attribute-list>': attributeCodecFactory,
-
-  '<unknown-type>':  makeValueCodecFactory(
-    predefinedTypes['might-be-any-type'],
-    [typeSensitiveCast, dataTypeToHlsType],
-    ['value', 'type']
-  )
+// Types specified in the HLS spec (plus a few convenient types _implied_ by the spec)
+export default {
+  '<decimal-integer>': NamedCaptureMixin(IntegerType, [numberCast], ['value']),
+  '<decimal-floating-point>': NamedCaptureMixin(UnsignedFloatingPointType, [numberCast], ['value']),
+  '<signed-decimal-floating-point>': NamedCaptureMixin(SignedFloatingPointType, [numberCast], ['value']),
+  '<hexadecimal-sequence>': NamedCaptureMixin(HexadecimalSequenceType, [hexCast], ['value']),
+  '<quoted-string>': NamedCaptureMixin(QuotedStringType, [identity], ['value']),
+  '<unquoted-string>': NamedCaptureMixin(EnumeratedType, [identity], ['value']),
+  '<uri>': NamedCaptureMixin(QuotedStringType, [identity], ['value']),
+  '<date-time-msec>': NamedCaptureMixin(DateTimeType, [dateCast], ['value']),
+  '<quoted-enumerated-string>': NamedCaptureMixin(QuotedStringType, [validateEnum], ['value']),
+  '<enumerated-string>': NamedCaptureMixin(EnumeratedType, [validateEnum], ['value']),
+  '<decimal-resolution>': NamedCaptureMixin(ResolutionType, [numberCast, numberCast], ['value.width', 'value.height']),
+  '<decimal-byterange>': NamedCaptureMixin(ByteRangeType, [numberCast, numberCast], ['value.length', 'value.offset']),
+  '<quoted-decimal-byterange>': NamedCaptureMixin(QuotedByteRangeType, [numberCast, numberCast], ['value.length', 'value.offset']),
+  '<decimal-floating-point-duration>': NamedCaptureMixin(DurationType, [numberCast, identity], ['value.duration', 'value.title']),
+  '<decimal-integer-duration>': NamedCaptureMixin(DurationType, [numberCast, identity], ['value.duration', 'value.title']),
+  '<attribute-list>': AttributeType,
+  '<unknown-type>': NamedCaptureMixin(FuzzyType, [typeSensitiveCast, dataTypeToHlsType], ['value', 'type']),
 };
-
-export default typedCodecFactories;

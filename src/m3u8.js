@@ -18,18 +18,16 @@ const detectPlaylistType = (arr) => {
     if (manifest !== 0) {
       console.warn('Detected a Media Playlist with some Manifest tags.');
     }
-    return 'playlist';
+    return 'media';
   }
 };
 
 const tagsWithDefault = tagSpec.filter((tag) => tag.default !== undefined);
 
 const addDefaults = (hlsObject) => {
-  if (hlsObject.playlistType === 'manifest') {
-    return hlsObject;
-  }
-
-  const missingDefaults = new Map(tagsWithDefault.map((t) => [t.name, t]));
+  const missingDefaults = new Map(tagsWithDefault
+    .filter(t => t.playlistType === 'both' || t.playlistType === hlsObject.playlistType)
+    .map((t) => [t.name, t]));
 
   hlsObject.forEach((line) => {
     missingDefaults.delete(line.name);
@@ -56,7 +54,7 @@ export default class M3u8Codec extends LineCodec {
 
   parse(m3u8Data) {
     const lines = m3u8Data.split('\n');
-    const hlsObject = lines.map((l) => super.parse(l));
+    const hlsObject = lines.map((line) => super.parse(line));
 
     hlsObject.playlistType = detectPlaylistType(hlsObject);
 

@@ -1,7 +1,39 @@
 import M3u8NestedCodec from './m3u8-nested.js';
 import { setProperty, getProperty } from './helpers/props.js';
 
-const gatherGlobalTags = (globals) => {
+const camelCaseIt = (str) => str.toLowerCase().replace(/-([a-z])/g, (m) => m[1].toUpperCase());
+const unCamelCaseIt = (str) => str.replace(/([A-Z])/g, (m) => '-' + m[0]).toUpperCase();
+const findAttr = (tag, attrName) => tag?.value.find(a => a.name === attrName);
+
+const createTagFactory = (videoJsCodec) => {
+  const tagFactory = (tagName, typeOverride) => {
+    const tagType = videoJsCodec.getTag(tagName);
+    const tag = tagType.createInstance();
+
+    tag.lineType = 'tag';
+
+    if (typeOverride) {
+      tag.type = typeOverride;
+    }
+
+    return tag;
+  };
+
+  tagFactory.createAttribute = (tagName, attributeName, typeOverride) => {
+    const tagType = videoJsCodec.getTag(tagName);
+    const attr = tagType.attributes.get(attributeName).createInstance();
+
+    if (typeOverride) {
+      attr.type = typeOverride;
+    }
+
+    return attr;
+  };
+
+  return tagFactory;
+};
+
+const buildGlobalTags = (globals) => {
   const output = {
     allowCache: true,
     discontinuityStarts: [],
@@ -10,6 +42,9 @@ const gatherGlobalTags = (globals) => {
 
   globals.forEach((tag) => {
     switch (tag.name) {
+    case '#EXT-X-VERSION':
+      output.version = tag.value;
+      break
     case '#EXT-X-TARGETDURATION':
       output.targetDuration = tag.value;
       break;
@@ -33,8 +68,8 @@ const gatherGlobalTags = (globals) => {
       break;
     case '#EXT-X-START':
       output.start = {
-        timeOffset: tag.value['TIME-OFFSET'].value,
-        precise: tag.value.PRECISE?.value === 'YES'
+        timeOffset: findAttr(tag, 'TIME-OFFSET')?.value,
+        precise: findAttr(tag, 'PRECISE')?.value === 'YES'
       };
     }
   });
@@ -42,10 +77,58 @@ const gatherGlobalTags = (globals) => {
   return output;
 };
 
-const mediaGroupAttr = ['DEFAULT', 'AUTOSELECT', 'FORCED', 'LANGUAGE', 'URI', 'INSTREAM-ID'];
+const fromGlobalTags = (createTag, videojsObj) => {
+  const output = {
+    globals: [
+      createTag('#EXTM3U')
+    ]
+  };
+
+  const mapping = [
+    ['#EXT-X-VERSION', videojsObj.version],
+    ['#EXT-X-TARGETDURATION', videojsObj.targetDuration],
+    ['#EXT-X-MEDIA-SEQUENCE', videojsObj.mediaSequence],
+    ['#EXT-X-DISCONTINUITY-SEQUENCE', videojsObj.discontinuitySequence],
+    ['#EXT-X-PLAYLIST-TYPE', videojsObj.playlistType],
+    ['#EXT-X-ALLOW-CACHE', videojsObj.allowCache ? 'YES' : 'NO'],
+    // TODO: figure out how to handle this one
+    // ['#EXT-X-I-FRAMES-ONLY', videojsObj.iframeOnly],
+  ];
+
+  if (videojsObj.endList) {
+    mapping.push(['#EXT-X-ENDLIST', null]);
+  }
+
+  if (videojsObj.start) {
+    const options = {
+      'TIME-OFFSET': { value: videojsObj.start },
+    };
+
+    if (videojsObj.precise) {
+      options.PRECISE = { value: 'YES' };
+    }
+    mapping.push(['#EXT-X-START', options]);
+  }
+
+  mapping.forEach((map) => {
+    const [name, value] = map;
+    if (value !== undefined) {
+      const tag = createTag(map[0]);
+      if (value !== null) {
+        tag.value = value;
+      }
+      output.globals.push(tag);
+    }
+  });
+
+  return output;
+};
+
 const booleanAttr = ['DEFAULT', 'AUTOSELECT', 'FORCED'];
-const camelCaseIt = (str) => str.toLowerCase().replace(/-([a-z])/g, (m) => m[1].toUpperCase());
+
 const buildMediaGroups = (videojsObj, globals) => {
+  const mediaGroupAttr = ['DEFAULT', 'AUTOSELECT', 'FORCED', 'LANGUAGE', 'URI', 'INSTREAM-ID'];
+
   videojsObj.mediaGroups = videojsObj.mediaGroups || {
     "VIDEO": {},
     "AUDIO": {},
@@ -59,23 +142,93 @@ const buildMediaGroups = (videojsObj, globals) => {
     if (tag.lineType === 'tag' && tag.name === '#EXT-X-MEDIA') {
       const obj = tag.value;
 
+      const objType = findAttr(tag, 'TYPE')?.value;
+      const objGroupId = findAttr(tag, 'GROUP-ID')?.value;
+      const objName = findAttr(tag, 'NAME')?.value;
+
       mediaGroupAttr.forEach((attr) => {
-        if (tag.value[attr] === undefined) {
+        let value = findAttr(tag, attr)?.value;
+
+        if (value === undefined || value === null) {
           return;
         }
-
-        let value = tag.value[attr].value;
 
         if (booleanAttr.indexOf(attr) !== -1) {
           value = value === 'YES';
         }
 
-        setProperty(mediaGroups, [obj.TYPE.value, obj['GROUP-ID'].value, obj.NAME.value, camelCaseIt(attr)], value);
+        // Set each property on path <TYPE>.<GROUP-ID>.<NAME>.<attributeName>
+        setProperty(mediaGroups, [objType, objGroupId, objName, camelCaseIt(attr)], value);
       });
     }
   });
 };
 
+const fromMediaGroups = (createTag, output, videojsObj) => {
+  if (!videojsObj.mediaGroups) {
+    return;
+  }
+
+  const mediaGroups = videojsObj.mediaGroups;
+  const types = ['VIDEO', 'AUDIO', 'CLOSED-CAPTIONS', 'SUBTITLES'];
+
+  types.forEach((mediaGroupType) => {
+    const mediaGroup = mediaGroups[mediaGroupType];
+    const groupIds = Object.keys(mediaGroup);
+
+    if (!groupIds.length) {
+      return;
+    }
+
+    groupIds.forEach((groupId) => {
+      const group = mediaGroup[groupId];
+      const names = Object.keys(group);
+
+      if (!names.length) {
+        return;
+      }
+
+      names.forEach((name) => {
+        const attributes = group[name];
+        const attributeNames = Object.keys(attributes);
+        const tag = createTag('#EXT-X-MEDIA');
+
+        tag.value = {
+          'NAME': createTag.createAttribute('#EXT-X-MEDIA', 'NAME'),
+          'GROUP-ID': createTag.createAttribute('#EXT-X-MEDIA', 'GROUP-ID'),
+          'TYPE': createTag.createAttribute('#EXT-X-MEDIA', 'TYPE')
+        };
+        tag.value.NAME.value = name;
+        tag.value['GROUP-ID'].value = groupId;
+        tag.value.TYPE.value = mediaGroupType;
+
+        if (!attributeNames.length) {
+          return;
+        }
+
+        attributeNames.forEach((attributeName) => {
+          const attribute = unCamelCaseIt(attributeName);
+          const value = attributes[attributeName];
+          const attr = createTag.createAttribute('#EXT-X-MEDIA', attribute);
+
+          attr.value = value;
+
+          if (booleanAttr.indexOf(attribute) !== -1) {
+            attr.value = attr.value ? 'YES': 'NO';
+          }
+
+          setProperty(tag, ['value', attribute], attr);
+        });
+
+        output.globals.push(tag);
+      });
+    });
+  });
+};
+
+// These are <decimal-integer> or <decimal-floating-point>
+// properties that the old video.js parser dumbly kept as strings.
+// Now we have to un-cast them back to strings stay compatible.
 const dumbStringProperties = ['AVERAGE-BANDWIDTH', 'FRAME-RATE'];
 
 const buildPlaylists = (videojsObj, playlists) => {
@@ -96,21 +249,55 @@ const buildPlaylists = (videojsObj, playlists) => {
       if (tag.lineType === 'uri') {
         currentObj.uri = tag.value;
       } else if (tag.lineType === 'tag' && tag.name === '#EXT-X-STREAM-INF') {
-        const valueProperties = Object.keys(tag.value);
-
         currentObj.attributes = {};
-        valueProperties.forEach((valueProperty) => {
-          if (dumbStringProperties.indexOf(valueProperty) !== -1) {
-            currentObj.attributes[valueProperty] = tag.value[valueProperty].value + '';
+
+        tag.value.forEach((attribute) => {
+          if (dumbStringProperties.indexOf(attribute.name) !== -1) {
+            currentObj.attributes[attribute.name] = attribute.value + '';
           } else {
-            currentObj.attributes[valueProperty] = tag.value[valueProperty].value;
+            currentObj.attributes[attribute.name] = attribute.value;
           }
         });
+      } else if (tag.lineType === 'tag' && tag.name === '#EXT-X-I-FRAME-STREAM-INF') {
+        // TODO: Support #EXT-X-I-FRAME-STREAM-INF
       }
-      // TODO: Support EXT-X-I-FRAME-STREAM-INF
     });
 
     output.push(currentObj);
+  });
+};
+
+
+const fromPlaylists = (createTag, output, videojsObj) => {
+  const playlists = videojsObj.playlists;
+
+  if (!playlists && !playlists.length) {
+    return;
+  }
+
+  output.playlists = [];
+
+  playlists.forEach((playlistEntry) => {
+    const streamInf = createTag('#EXT-X-STREAM-INF');
+    const attributeNames = Object.keys(playlistEntry.attributes);
+
+    streamInf.value = {};
+    attributeNames.forEach((attributeName) => {
+      const attr = createTag.createAttribute('#EXT-X-STREAM-INF', attributeName);
+
+      if (dumbStringProperties.indexOf(attributeName) !== -1) {
+        attr.value = parseFloat(playlistEntry.attributes[attributeName]);
+      } else {
+        attr.value = playlistEntry.attributes[attributeName];
+      }
+      streamInf.value[attributeName] = attr;
+    });
+
+    output.playlists.push(streamInf);
+    output.playlists.push({
+      lineType: 'uri',
+      value: playlistEntry.uri
+    });
   });
 };
 
@@ -165,12 +352,16 @@ const buildSegments = (videojsObj, segments) => {
       timeline: currentDisco,
     };
 
+    // These are both values that are "sticky" - once defined on a segment
+    // they will apply to all future segments until new values are declared
     if (last && last.key) {
       currentObj.key = last.key;
     }
     if (last && last.map) {
       currentObj.map = last.map;
     }
+
+    // This is objectively wrong but video.js does it...
     currentObj.duration = videojsObj.targetDuration;
 
     segmentArr.forEach((tag) => {
@@ -182,6 +373,7 @@ const buildSegments = (videojsObj, segments) => {
           if (!isNaN(tag.value.duration)) {
             currentObj.duration = tag.value.duration;
           }
+          // Video.js doesn't seem to do anything with the `title` attribute??
           // if (tag.value.title && tag.value.title.length) {
           //   currentObj.title = tag.value.title;
           // }
@@ -189,6 +381,7 @@ const buildSegments = (videojsObj, segments) => {
         case '#EXT-X-BYTERANGE':
           currentObj.byterange = tag.value;
 
+          // It's possible for the offset to be missing in which case, it's calculated
           if (isNaN(currentObj.byterange.offset)) {
             const last = output[output.length - 1];
 
@@ -202,30 +395,36 @@ const buildSegments = (videojsObj, segments) => {
           break;
         case '#EXT-X-KEY':
           currentObj.key = {};
-          if (tag.value.METHOD) {
-            if (tag.value.METHOD.value === 'NONE') {
+          const method = findAttr(tag, 'METHOD')?.value;
+          const uri = findAttr(tag, 'URI')?.value;
+          const iv = findAttr(tag, 'IV')?.value;
+          if (method) {
+            if (method === 'NONE') {
               delete currentObj.key;
               return;
             }
-            currentObj.key.method = tag.value.METHOD.value;
+            currentObj.key.method = method;
           }
-          if (tag.value.URI) {
-            currentObj.key.uri = tag.value.URI.value;
+          if (uri) {
+            currentObj.key.uri = uri;
           }
-          if (tag.value.IV) {
-            currentObj.key.iv = new Uint32Array(switchEndianness(tag.value.IV.value));
+          if (iv) {
+            currentObj.key.iv = new Uint32Array(switchEndianness(iv));
           }
           break;
         case '#EXT-X-MAP':
           currentObj.map = {
-            byterange: tag.value.BYTERANGE.value,
-            uri: tag.value.URI.value
+            byterange: findAttr(tag, 'BYTERANGE')?.value,
+            uri: findAttr(tag, 'URI')?.value
           };
           break;
         case '#EXT-X-PROGRAM-DATE-TIME':
+          // Why does video.js store two copies of the same value?
+          // No one knows!
           currentObj.dateTimeString = tag.value.toISOString();
           currentObj.dateTimeObject = tag.value;
 
+          // We also set the "global" dateTime values to the very first PDT we encounter
           if (!videojsObj.dateTimeString) {
             videojsObj.dateTimeString = tag.value.toISOString();
             videojsObj.dateTimeObject = tag.value;
@@ -242,6 +441,101 @@ const buildSegments = (videojsObj, segments) => {
   });
 };
 
+const keyEquals = (keyA, keyB) => keyA.uri === keyB.uri && keyA.method  === keyB.method && keyA.iv === keyB.iv;
+
+const fromSegments = (createTag, output, videojsObj) => {
+  const segments = videojsObj.segments;
+
+  if (!segments && !segments.length) {
+    return;
+  }
+  output.segments = [];
+
+  let previousKey;
+
+  segments.forEach((segmentEntry) => {
+    const segmentArr = [];
+    const tag = createTag('#EXTINF');
+
+    tag.value = { duration: segmentEntry.duration };
+    segmentArr.push(tag);
+
+    if (segmentEntry.byterange) {
+      const tag = createTag('#EXT-X-BYTERANGE');
+      tag.value = segmentEntry.byterange;
+      segmentArr.push(tag);
+    }
+
+    if (segmentEntry.discontinuity) {
+      const tag = createTag('#EXT-X-DISCONTINUITY');
+      segmentArr.push(tag);
+    }
+
+    if (previousKey || segmentEntry.key) {
+      // This means that there is a previously set encryption key BUT the
+      // current segment lacks one so we must set METHOD=NONE
+      if (!segmentEntry.key) {
+        const tag = createTag('#EXT-X-KEY');
+
+        previousKey = null;
+        setProperty(tag, ['value', 'METHOD', 'value'], 'NONE');
+
+        segmentArr.push(tag);
+      } else if (!previousKey || !keyEquals(previousKey, segmentEntry.key)) {
+        const tag = createTag('#EXT-X-KEY');
+
+        previousKey = segmentEntry.key;
+
+        let attr = createTag.createAttribute('#EXT-X-KEY', 'METHOD');
+        attr.value = segmentEntry.key.method;
+        setProperty(tag, ['value', 'METHOD'], attr);
+
+        attr = createTag.createAttribute('#EXT-X-KEY', 'IV');
+        attr.value = switchEndianness(segmentEntry.key.iv.buffer);
+        setProperty(tag, ['value', 'IV'], attr);
+
+        attr = createTag.createAttribute('#EXT-X-KEY', 'URI');
+        attr.value = segmentEntry.key.uri;
+        setProperty(tag, ['value', 'URI'], attr);
+
+        segmentArr.push(tag);
+      }
+    }
+
+    if (segmentEntry.map) {
+      const tag = createTag('#EXT-X-MAP');
+
+      let attr = createTag.createAttribute('#EXT-X-MAP', 'BYTERANGE');
+      attr.value = segmentEntry.map.byterange;
+      setProperty(tag, ['value', 'BYTERANGE'], attr);
+
+      attr = createTag.createAttribute('#EXT-X-MAP', 'URI');
+      attr.value = segmentEntry.map.uri;
+      setProperty(tag, ['value', 'URI'], attr);
+
+      segmentArr.push(tag);
+    }
+
+    if (segmentEntry.dateTimeObject) {
+      const tag = createTag('#EXT-X-PROGRAM-DATE-TIME');
+      tag.value = segmentEntry.dateTimeObject;
+      segmentArr.push(tag);
+    }
+
+    // TODO: Figure out what this should look like...
+    if (segmentEntry.dateRange) {
+      const tag = createTag('#EXT-X-DATERANGE');
+    }
+
+    segmentArr.push({
+      lineType: 'uri',
+      value: segmentEntry.uri
+    });
+
+    output.segments.push(segmentArr);
+  });
+};
+
 export default class VideojsCodec extends M3u8NestedCodec {
   constructor (mainTagSpec, mainTypeSpec) {
     super(mainTagSpec, mainTypeSpec);
@@ -249,8 +543,7 @@ export default class VideojsCodec extends M3u8NestedCodec {
 
   parse(m3u8Data) {
     const hlsObject = super.parse(m3u8Data);
-
-    const videojsObj = gatherGlobalTags(hlsObject.globals);
+    const videojsObj = buildGlobalTags(hlsObject.globals);
 
     if (hlsObject.playlistType === 'manifest') {
       buildMediaGroups(videojsObj, hlsObject.globals);
@@ -262,7 +555,19 @@ export default class VideojsCodec extends M3u8NestedCodec {
     return videojsObj;
   }
 
-  stringify(nestedHlsObject) {
+  stringify(videojsObj) {
+    const createTag = createTagFactory(this);
+    const nestedHlsObject = fromGlobalTags(createTag, videojsObj);
+
+
+    if (videojsObj.playlists?.length) {
+      nestedHlsObject.playlists = [];
+      fromMediaGroups(createTag, nestedHlsObject, videojsObj);
+      fromPlaylists(createTag, nestedHlsObject, videojsObj);
+    } else if (videojsObj.segments?.length) {
+      nestedHlsObject.segments = [];
+      fromSegments(createTag, nestedHlsObject, videojsObj);
+    }
     const m3u8Data = super.stringify(nestedHlsObject);
 
     return m3u8Data;

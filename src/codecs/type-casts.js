@@ -47,7 +47,7 @@ export const hexCast = {
     }
 
     const byteString = stringWithout0x.match(/[0-9a-fA-F][0-9a-fA-F]/g);
-    const byteArray = Uint8Array.from(byteString, x => parseInt(x, 16));
+    const byteArray = new Uint8Array(byteString.map(x => parseInt(x, 16)));
 
     return byteArray.buffer;
   },

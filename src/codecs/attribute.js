@@ -1,62 +1,74 @@
-const attributeCodecFactory = (typeContext) => {
-  return {
-    parse: (output, str) => {
-      let currentStr = str;
-      const attributes = output.value || (output.value = {});
+const findAttr = (tag, attrName) => tag?.value.find(a => a.name === attrName);
 
-      while (currentStr.length) {
-        const equalsOffset = currentStr.indexOf('=');
+export class AttributeType {
+  #typeContext;
 
-        if (equalsOffset === -1) {
-          throw new Error(`Malformed attribute string at "${currentStr}".`);
-        }
+  constructor(typeContext) {
+    this.#typeContext = typeContext;
+  }
 
-        // get attribute name
-        const attributeName = currentStr.slice(0, equalsOffset).trim();
+  parse(output, str) {
+    let currentStr = str;
+    const attributes = output.value || (output.value = []);
 
-        // str.slice(attribute name length)
-        currentStr = currentStr.slice(equalsOffset + 1);
+    while (currentStr.length) {
+      const equalsOffset = currentStr.indexOf('=');
 
-        // look-up type
-        let attributeType = typeContext.attributes.get(attributeName) || typeContext.attributes.get('UNKNOWN-ATTRIBUTE');
-
-        if (!attributeType) {
-          throw new Error(`Attribute "${attributeName}" not allowed on tag "${typeContext.name}".`);
-        }
-
-        // create a new attribute object
-        attributes[attributeName] = attributeType.createInstance();
-
-        // get attribute value
-        const charsConsumed = attributeType.parse(attributes[attributeName], currentStr);
-
-        // str.slice(attribute name length)
-        currentStr = currentStr.slice(charsConsumed + 1);
-      }
-    },
-    stringify: (output, obj) => {
-      const attributes = obj.value;
-
-      if (!attributes) {
-        return output;
+      if (equalsOffset === -1) {
+        throw new Error(`Malformed attribute string at "${currentStr}".`);
       }
 
-      const attributeProperties = Object.keys(attributes);
-      const attributeStrings = attributeProperties.map((attributeProperty) => {
-        const attributeValue = attributes[attributeProperty];
-        // look-up type
-        const attributeType = typeContext.attributes.get(attributeValue.name);
+      // get attribute name
+      const attributeName = currentStr.slice(0, equalsOffset).trim();
 
-        if (!attributeType) {
-          throw new Error(`Attribute "${attributeProperty}" not allowed on tag "${typeContext.name}".`);
-        }
+      // str.slice(attribute name length)
+      currentStr = currentStr.slice(equalsOffset + 1);
 
-        return attributeProperty + '=' + attributeType.stringify(output, attributeValue);
-      });
+      // look-up type
+      let attributeType = this.#typeContext.attributes.get(attributeName) || this.#typeContext.attributes.get('UNKNOWN-ATTRIBUTE');
 
-      return output + attributeStrings.join(',');
+      if (!attributeType) {
+        throw new Error(`Attribute "${attributeName}" not allowed on tag "${this.#typeContext.name}".`);
+      }
+      // create a new attribute object
+      const attributeObj = findAttr(output, attributeName) || attributeType.createInstance();
+
+      if (attributeObj.name !== attributeName) {
+        attributeObj.name = attributeName;
+      }
+
+      attributes.push(attributeObj);
+
+      // get attribute value
+      const charsConsumed = attributeType.parse(attributeObj, currentStr);
+
+      // str.slice(attribute name length)
+      currentStr = currentStr.slice(charsConsumed + 1);
     }
-  };
-};
+  }
 
-export default attributeCodecFactory;
+  stringify(output, obj) {
+    const attributes = obj.value;
+
+    if (!attributes) {
+      return output;
+    }
+
+    // const attributeProperties = Object.keys(attributes);
+    const attributeStrings = attributes.map((attributeObj) => {
+
+    // const attributeStrings = attributeProperties.map((attributeProperty) => {
+      // const attributeValue = attributes[attributeProperty];
+      // look-up type
+      const attributeType = this.#typeContext.attributes.get(attributeObj.name) || this.#typeContext.attributes.get('UNKNOWN-ATTRIBUTE');
+
+      if (!attributeType) {
+        throw new Error(`Attribute "${attributeObj.name}" not allowed on tag "${this.#typeContext.name}".`);
+      }
+
+      return attributeObj.name + '=' + attributeType.stringify(output, attributeObj);
+    });
+
+    return output + attributeStrings.join(',');
+  }
+}
