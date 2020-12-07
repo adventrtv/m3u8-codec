@@ -1,11 +1,11 @@
-import { tagSpec, typeSpec } from './hls-spec.js';
+import { tagSpec, typeSpec } from '../hls.js';
 
 // Build a new instance of tag
 // Tags copy most of the properties from the tagSpec but are missing the
 // parse and stringify functions AND attribute specs
 const baseProperties = [
   'name', 'type',
-  'playlistType', 'appliesToNextUri',
+  'playlistType', 'appliesToNextUri', 'isCustom',
   // 'default', 'allowed', 'required',
   'minVersion', 'maxVersion'
 ];
@@ -52,10 +52,10 @@ const createTagInstance = (tag) => {
   };
 };
 
-const generateTagMapElement = (typeSpec) => {
+const generateTagMapElement = (typeSpecData) => {
   const attributeElementGenerator = (parentTag) => (attrType) => {
     if (attrType.type !== null) {
-      const AttrTypeSpec = typeSpec[attrType.type];
+      const AttrTypeSpec = typeSpecData[attrType.type];
 
       if (!AttrTypeSpec) {
         throw new Error(`Tag "${parentTag.name}" defines an attribute "${attrType.name}" which declares unknown type "${attrType.type}"`);
@@ -76,7 +76,7 @@ const generateTagMapElement = (typeSpec) => {
     const attrTypes = tagType.attributes;
 
     if (tagType.type !== null) {
-      const TagTypeSpec = typeSpec[tagType.type];
+      const TagTypeSpec = typeSpecData[tagType.type];
 
       if (!TagTypeSpec) {
         throw new Error(`Tag "${tagType.name}" declares unknown type "${tagType.type}"`);
@@ -113,45 +113,45 @@ export default class LineCodec {
   #parseTag;
   #serializeTag;
 
-  constructor (mainTagSpec = tagSpec, mainTypeSpec = typeSpec) {
+  constructor(mainTagSpec = tagSpec, mainTypeSpec = typeSpec) {
     this.#localTypeSpec = Object.create(mainTypeSpec);
     this.#defaultTagMapElementGenerator = generateTagMapElement(this.#localTypeSpec);
     // Build O(1) lookup table(s) from spec
     this.#tagSpecMap = new Map(mainTagSpec.map(this.#defaultTagMapElementGenerator));
 
     this.#parseTag = (input) => {
-      let tagName = input;
       const firstColon = input.indexOf(':');
+
+      let tagName = input;
+
       let tagValue = '';
 
       if (firstColon !== -1) {
         tagName = input.slice(0, firstColon);
         tagValue = input.slice(firstColon + 1);
       }
+      const tagSpecData = this.#tagSpecMap.get(tagName);
 
-      const tagSpec = this.#tagSpecMap.get(tagName);
-
-      if (!tagSpec) {
+      if (!tagSpecData) {
         return {
           lineType: 'comment',
           value: input
         };
         // throw new Error(`Found unknown tag "${tagName}".`);
       }
-
-      const output = tagSpec.createInstance();
+      const output = tagSpecData.createInstance();
 
       // TODO: Stop special-casing type null?
-      if (tagSpec.type === null && tagValue !== '') {
-        throw new Error(`Tag "${tagSpec.name}" has no value but found "${tagValue}".`);
+      if (tagSpecData.type === null && tagValue !== '') {
+        throw new Error(`Tag "${tagSpecData.name}" has no value but found "${tagValue}".`);
       }
 
-      if (tagSpec.type !== null && tagValue === '') {
-        throw new Error(`Tag "${tagSpec.name}" has a value but none were found.`);
+      if (tagSpecData.type !== null && tagValue === '') {
+        throw new Error(`Tag "${tagSpecData.name}" has a value but none were found.`);
       }
 
       if (tagValue !== '') {
-        tagSpec.parse(output, tagValue);
+        tagSpecData.parse(output, tagValue);
       }
 
       output.lineType = 'tag';
@@ -159,13 +159,12 @@ export default class LineCodec {
       return output;
     };
 
-
     this.#serializeTag = (lineObj) => {
-      const tagSpec = this.#tagSpecMap.get(lineObj.name);
+      const tagSpecData = this.#tagSpecMap.get(lineObj.name);
 
       // TODO: Stop special-casing type null?
-      if (tagSpec.type !== null) {
-        const valueString = tagSpec.stringify('', lineObj);
+      if (tagSpecData.type !== null) {
+        const valueString = tagSpecData.stringify(lineObj);
 
         return `${lineObj.name}:${valueString}`;
       }
@@ -181,10 +180,14 @@ export default class LineCodec {
       localTagMapElementGenerator = generateTagMapElement(newTypeSpec);
     }
 
-    this.#tagSpecMap.set(...localTagMapElementGenerator(newTagSpec));
+    this.#tagSpecMap.set(...localTagMapElementGenerator({
+      playlistType: 'both',
+      isCustom: true,
+      ...newTagSpec
+    }));
   }
 
-  setCustomType (newTypeName, newTypeSpec) {
+  setCustomType(newTypeName, newTypeSpec) {
     this.#localTypeSpec[newTypeName] = newTypeSpec;
   }
 
@@ -212,6 +215,10 @@ export default class LineCodec {
   stringify(lineObj) {
     let str;
 
+    if (!lineObj) {
+      return;
+    }
+
     switch (lineObj.lineType) {
     case 'tag':
       str = this.#serializeTag(lineObj);
@@ -226,4 +233,4 @@ export default class LineCodec {
 
     return str;
   }
-};
+}

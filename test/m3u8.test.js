@@ -1,17 +1,13 @@
 import QUnit from 'qunit';
-import sinon from 'sinon';
+// import sinon from 'sinon';
 
-import VideojsCodec from '../src/videojs.js';
+import VideojsCodec from '../src/codecs/videojs.js';
+import LineCodec from '../src/codecs/line.js';
 
-import LineCodec from '../src/line-codec.js';
-import { tagSpec, typeSpec } from '../src/hls-spec.js';
+// import { tagSpec, typeSpec } from '../src/hls.js';
 
-// imports to help me build a new "type"
-import makeValueCodecFactory from '../src/codecs/value.js';
-import { makeRegexCodec } from '../src/codecs/regexp.js';
-
-const onlyMediaTags = tagSpec.filter((tag) => tag.playlistType !== 'manifest');
-const onlyManifestTags = tagSpec.filter((tag) => tag.playlistType !== 'media');
+// const onlyMediaTags = tagSpec.filter((tag) => tag.playlistType !== 'manifest');
+// const onlyManifestTags = tagSpec.filter((tag) => tag.playlistType !== 'media');
 
 QUnit.module('Line-Codec', () => {
 
@@ -32,7 +28,12 @@ QUnit.module('Line-Codec', () => {
     QUnit.test('TAG is parsed correctly', function(assert) {
       const data = this.lineCodec.parse('#EXT-TAG');
 
-      assert.deepEqual(data, {name: '#EXT-TAG', type: null, value: null, lineType: 'tag'});
+      assert.deepEqual(data, {
+        name: '#EXT-TAG',
+        type: null,
+        value: null,
+        lineType: 'tag'
+      });
     });
 
     QUnit.test('TAG is stringified correctly', function(assert) {
@@ -43,12 +44,13 @@ QUnit.module('Line-Codec', () => {
     });
 
     QUnit.test('TAG can NOT have a value', function(assert) {
-      assert.throws(() => this.lineCodec.parse('#EXT-TAG:foo'),  /Tag "[^"]+" has no value but found "[^"]+"./);
+      assert.throws(() => this.lineCodec.parse('#EXT-TAG:foo'), /Tag "[^"]+" has no value but found "[^"]+"./);
     });
 
     QUnit.test('Unknown TAGS are treated as comments', function(assert) {
       const output = this.lineCodec.parse('#EXT-FOO');
-      assert.deepEqual(output, {lineType: 'comment', value:'#EXT-FOO'});
+
+      assert.deepEqual(output, {lineType: 'comment', value: '#EXT-FOO'});
     });
 
     QUnit.test('Lines starting with a # but not #EXT are interpreted as comments', function(assert) {
@@ -70,7 +72,14 @@ QUnit.module('Line-Codec', () => {
       });
       const data = this.lineCodec.parse('#EXT-FOO');
 
-      assert.deepEqual(data, {name: '#EXT-FOO', type: null, value: null, lineType: 'tag'});
+      assert.deepEqual(data, {
+        name: '#EXT-FOO',
+        type: null,
+        value: null,
+        lineType: 'tag',
+        playlistType: 'both',
+        isCustom: true
+      });
     });
   });
 
@@ -89,8 +98,8 @@ QUnit.module('Line-Codec', () => {
             parse: (output, str) => {
               output.value = str;
             },
-            stringify: (output, obj) => {
-              return output + obj.value;
+            stringify: (obj) => {
+              return obj.value;
             }
           };
         }
@@ -103,7 +112,12 @@ QUnit.module('Line-Codec', () => {
     QUnit.test('TAG is parsed correctly', function(assert) {
       const data = this.lineCodec.parse('#EXT-TAG:foo');
 
-      assert.deepEqual(data, {name: '#EXT-TAG', type: 'string', value: 'foo', lineType: 'tag'});
+      assert.deepEqual(data, {
+        name: '#EXT-TAG',
+        type: 'string',
+        value: 'foo',
+        lineType: 'tag'
+      });
     });
 
     QUnit.test('TAG is stringified correctly', function(assert) {
@@ -119,7 +133,8 @@ QUnit.module('Line-Codec', () => {
 
     QUnit.test('Unknown TAGS are treated as comments', function(assert) {
       const output = this.lineCodec.parse('#EXT-FOO');
-      assert.deepEqual(output, {lineType: 'comment', value:'#EXT-FOO'});
+
+      assert.deepEqual(output, {lineType: 'comment', value: '#EXT-FOO'});
     });
 
     QUnit.test('Custom TAG types can be added after codec initialization', function(assert) {
@@ -130,60 +145,128 @@ QUnit.module('Line-Codec', () => {
 
       const data = this.lineCodec.parse('#EXT-FOO:123');
 
-      assert.deepEqual(data, {name: '#EXT-FOO', type: 'bar', value: '123', lineType: 'tag'});
+      assert.deepEqual(data, {
+        name: '#EXT-FOO',
+        type: 'bar',
+        value: '123',
+        lineType: 'tag',
+        playlistType: 'both',
+        isCustom: true
+      });
     });
   });
 });
 
 import testDataExpected from './dist/test-expected.js';
 import testDataManifests from './dist/test-manifests.js';
+import testDataOutputs from './dist/test-output.js';
 
 // This asserts that all the properties in the expected object are
 // present in the actual but actual can contain ADDITIONAL properties
-QUnit.assert.deepEqualWithExtra = function (actual, expected, message, child = false) {
+QUnit.assert.deepEqualWithExtra = function(actual, expected, message, child = false) {
   const mustHaveKeys = Object.keys(expected);
 
   for (let i = 0; i < mustHaveKeys.length; i++) {
     const key = mustHaveKeys[i];
+
     if (typeof expected[key] === 'object') {
       const result = QUnit.assert.deepEqualWithExtra(actual[key], expected[key], message, true);
+
       if (!result) {
-        if(child) {
+        if (child) {
           return false;
-        } else {
-          return this.pushResult({
-            result: false,
-            actual: actual,
-            expected: expected,
-            message: message
-          });
         }
+        return this.pushResult({
+          result: false,
+          actual,
+          expected,
+          message
+        });
       }
     } else if (actual[key] !== expected[key]) {
       if (child) {
         return false;
-      } else {
-        return this.pushResult({
-          result: false,
-          actual: actual,
-          expected: expected,
-          message: message
-        });
       }
+      return this.pushResult({
+        result: false,
+        actual,
+        expected,
+        message
+      });
     }
   }
   this.pushResult({
     result: true,
-    actual: actual,
-    expected: expected,
-    message: message
+    actual,
+    expected,
+    message
   });
   return true;
+};
+
+const isArrayEqualish = function(actual, expected) {
+  if (!Array.isArray(expected) || !Array.isArray(actual)) {
+    return false;
+  }
+
+  return expected.every((e) => {
+    if (Array.isArray(e)) {
+      const sameTag = actual.filter(a => a[0] === e[0]);
+
+      return sameTag.some(ssub => isArrayEqualish(ssub, e));
+    }
+    return actual.indexOf(e) !== -1;
+  });
+};
+
+QUnit.assert.arrayEqualWithExtra = function(actual, expected, message) {
+  if (!Array.isArray(expected) || !Array.isArray(actual)) {
+    return this.pushResult({
+      result: false,
+      actual,
+      expected,
+      message
+    });
+  }
+
+  return this.pushResult({
+    result: isArrayEqualish(actual, expected),
+    actual,
+    expected,
+    message
+  });
+};
+
+// Coax the output text into a format that can be compared without regard for order of lines
+const makeComparableArrays = (str) => {
+  const lines = str.split('\n').map(s => s.trim()).filter(s => s.length);
+
+  const tagDataArray = lines.map(s => {
+    const n = s.split(':');
+
+    let r = n.slice(1);
+
+    if (r.length > 0) {
+      r = r.join(':');
+    } else {
+      r = '';
+    }
+    return [n[0], r];
+  });
+
+  let attributes = tagDataArray.map((a) => [a[0], a[1].replace(/="([^"]*)"$/g, (t, b) => `="${encodeURIComponent(b)}"`)]);
+
+  attributes = attributes.map((a) => [a[0], a[1].replace(/="([^"]*)",/g, (t, b) => `="${encodeURIComponent(b)}",`)]);
+  return attributes.map((a) => [a[0], ...a[1].split(',').filter(s => s.length)]);
 };
 
 QUnit.module('Fixtures', {
   before() {
     this.videojsCodec = new VideojsCodec();
+    this.videojsCodec.setCustomTag({
+      name: '#ZEN-TOTAL-DURATION',
+      type: '<decimal-floating-point>'
+    });
   }
 }, () => {
   const keys = Object.keys(testDataManifests);
@@ -205,12 +288,23 @@ QUnit.module('Fixtures', {
     positiveTests.forEach((key) => {
       const manifest = testDataManifests[key];
       const expected = testDataExpected[key];
+      const output = testDataOutputs[key];
 
       QUnit.test(`${key}.m3u8`, function(assert) {
-        const output = this.videojsCodec.parse(manifest);
+        const result = this.videojsCodec.parse(manifest);
+
         assert.deepEqualWithExtra(
-          output,
+          result,
           expected,
+          key + '.m3u8 was parsed correctly'
+        );
+        const manifestComparable = makeComparableArrays(output || manifest);
+        const serialized = this.videojsCodec.stringify(result);
+        const serializedComparable = makeComparableArrays(serialized);
+
+        assert.arrayEqualWithExtra(
+          serializedComparable,
+          manifestComparable,
           key + '.m3u8 was parsed correctly'
         );
       });
@@ -222,10 +316,10 @@ QUnit.module('Fixtures', {
       const manifest = testDataManifests[key];
 
       QUnit.test(`${key}.m3u8`, function(assert) {
-        assert.throws(()=> {
+        assert.throws(() => {
           this.videojsCodec.parse(manifest);
         }, key + '.m3u8 failed correctly');
       });
     });
-  })
+  });
 });

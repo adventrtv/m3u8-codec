@@ -5,10 +5,9 @@ const generate = require('videojs-generate-rollup-config');
 const options = {
   input: 'src/index.js',
   babel(bOpts) {
-    // Not sure if I need both but why not?
-    bOpts.plugins.push(["@babel/plugin-proposal-class-properties"/*, { "loose": true }*/]);
-    bOpts.plugins.push(["@babel/plugin-proposal-private-methods"/*, { "loose": true }*/]);
-    bOpts.plugins.push(["@babel/plugin-proposal-export-default-from"]);
+    bOpts.plugins.push(['@babel/plugin-proposal-class-properties']);
+    bOpts.plugins.push(['@babel/plugin-proposal-private-methods']);
+    bOpts.plugins.push(['@babel/plugin-proposal-export-default-from']);
 
     return bOpts;
   },
@@ -33,6 +32,7 @@ const options = {
     return pOpts;
   }
 };
+
 const config = generate(options);
 
 if (config.builds.test) {

@@ -1,9 +1,11 @@
-import LineCodec from './line-codec.js';
-import { tagSpec } from './hls-spec.js';
+/* eslint no-console: 0 */
+
+import LineCodec from './line.js';
+import { tagSpec } from '../hls.js';
 
 const detectPlaylistType = (arr) => {
   const {manifest, media} = arr.reduce((results, line) => {
-    if (line.lineType==='tag' && line.playlistType !== 'both') {
+    if (line.lineType === 'tag' && line.playlistType !== 'both') {
       results[line.playlistType]++;
     }
     return results;
@@ -14,12 +16,12 @@ const detectPlaylistType = (arr) => {
       console.warn('Detected a Manifest Playlist with some Media tags.');
     }
     return 'manifest';
-  } else {
-    if (manifest !== 0) {
-      console.warn('Detected a Media Playlist with some Manifest tags.');
-    }
-    return 'media';
   }
+
+  if (manifest !== 0) {
+    console.warn('Detected a Media Playlist with some Manifest tags.');
+  }
+  return 'media';
 };
 
 const tagsWithDefault = tagSpec.filter((tag) => tag.default !== undefined);
@@ -47,8 +49,8 @@ const addDefaults = (hlsObject) => {
   return hlsObject;
 };
 
-export default class M3u8Codec extends LineCodec {
-  constructor (mainTagSpec, mainTypeSpec) {
+export default class M3U8Codec extends LineCodec {
+  constructor(mainTagSpec, mainTypeSpec) {
     super(mainTagSpec, mainTypeSpec);
   }
 
@@ -62,9 +64,9 @@ export default class M3u8Codec extends LineCodec {
   }
 
   stringify(hlsObject) {
-    const lines = hlsObject.map((o) => super.stringify(o));
+    const lines = hlsObject?.map((o) => super.stringify(o));
     const m3u8Data = lines.join('\n');
 
     return m3u8Data;
   }
-};
+}

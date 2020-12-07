@@ -1,15 +1,13 @@
-const findAttr = (tag, attrName) => tag?.value.find(a => a.name === attrName);
-
-export class AttributeType {
+export default class AttributeType {
   #typeContext;
 
   constructor(typeContext) {
     this.#typeContext = typeContext;
   }
 
-  parse(output, str) {
+  parse(str) {
     let currentStr = str;
-    const attributes = output.value || (output.value = []);
+    const attributes = [];
 
     while (currentStr.length) {
       const equalsOffset = currentStr.indexOf('=');
@@ -25,13 +23,13 @@ export class AttributeType {
       currentStr = currentStr.slice(equalsOffset + 1);
 
       // look-up type
-      let attributeType = this.#typeContext.attributes.get(attributeName) || this.#typeContext.attributes.get('UNKNOWN-ATTRIBUTE');
+      const attributeType = this.#typeContext.attributes.get(attributeName) || this.#typeContext.attributes.get('UNKNOWN-ATTRIBUTE');
 
       if (!attributeType) {
         throw new Error(`Attribute "${attributeName}" not allowed on tag "${this.#typeContext.name}".`);
       }
       // create a new attribute object
-      const attributeObj = findAttr(output, attributeName) || attributeType.createInstance();
+      const attributeObj = attributeType.createInstance();
 
       if (attributeObj.name !== attributeName) {
         attributeObj.name = attributeName;
@@ -45,20 +43,18 @@ export class AttributeType {
       // str.slice(attribute name length)
       currentStr = currentStr.slice(charsConsumed + 1);
     }
+
+    return [ attributes ];
   }
 
-  stringify(output, obj) {
-    const attributes = obj.value;
+  stringify(matches) {
+    const attributes = matches[0];
 
     if (!attributes) {
-      return output;
+      return '';
     }
 
-    // const attributeProperties = Object.keys(attributes);
     const attributeStrings = attributes.map((attributeObj) => {
-
-    // const attributeStrings = attributeProperties.map((attributeProperty) => {
-      // const attributeValue = attributes[attributeProperty];
       // look-up type
       const attributeType = this.#typeContext.attributes.get(attributeObj.name) || this.#typeContext.attributes.get('UNKNOWN-ATTRIBUTE');
 
@@ -66,9 +62,9 @@ export class AttributeType {
         throw new Error(`Attribute "${attributeObj.name}" not allowed on tag "${this.#typeContext.name}".`);
       }
 
-      return attributeObj.name + '=' + attributeType.stringify(output, attributeObj);
+      return attributeObj.name + '=' + attributeType.stringify(attributeObj);
     });
 
-    return output + attributeStrings.join(',');
+    return attributeStrings.join(',');
   }
 }

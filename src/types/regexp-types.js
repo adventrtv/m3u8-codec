@@ -34,16 +34,12 @@ export class HexadecimalSequenceType extends IdentityType {
   regexp = /^(0[xX][0-9A-Fa-f]+)/;
 }
 
-export class RemainingLineType extends IdentityType {
-  regexp = /^([^\n]*)/;
-}
-
 export class DateTimeType extends IdentityType {
   regexp = /^(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?(?:(?:[+-]\d\d:\d\d)|Z))/;
 }
 
 export class EnumeratedType extends IdentityType {
-  regexp  = /^([^\s,"]+)/;
+  regexp = /^([^\s,"]+)/;
 }
 
 export class QuotedStringType extends IdentityType {
@@ -85,7 +81,7 @@ export class DurationType extends IdentityType {
 
   stringify(justMatches) {
     // The "title" part of the extinf's duration is optional but the comma isn't!
-    return `${justMatches[0]},${justMatches[1] !== undefined ? justMatches[1] : ''}`;
+    return `${justMatches[0]},${justMatches[1] || ''}`;
   }
 }
 
@@ -104,6 +100,7 @@ export class FuzzyType extends IdentityType {
 
   parse(string) {
     let type = 'string';
+
     let justMatches = this.#quotedString.parse(string);
 
     if (!justMatches) {
@@ -112,7 +109,7 @@ export class FuzzyType extends IdentityType {
     }
 
     if (!justMatches) {
-      type = 'number'
+      type = 'number';
       justMatches = this.#floatingPoint.parse(string);
     }
 
@@ -129,6 +126,7 @@ export class FuzzyType extends IdentityType {
 
   stringify(justMatches) {
     const type = justMatches[1];
+
     justMatches.length = 1;
 
     if (type === 'string') {
@@ -143,6 +141,6 @@ export class FuzzyType extends IdentityType {
       return this.#floatingPoint.stringify(justMatches);
     }
 
-    throw new Error('Could not find a suitable serializer for an unknown type attribute!');
+    throw new Error(`Could not find a suitable serializer for an unknown type attribute (${type})!`);
   }
-};
+}

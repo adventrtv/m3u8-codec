@@ -1,13 +1,14 @@
-import M3u8Codec from './m3u8.js';
+import M3U8Codec from './m3u8.js';
 
 const groupPlaylistObject = (hlsObject) => {
-  const groupLocation = hlsObject.playlistType === 'manifest' ? 'playlists': 'segments';
+  const groupLocation = hlsObject.playlistType === 'manifest' ? 'playlists' : 'segments';
   const groupedLines = {
     playlistType: hlsObject.playlistType,
-    globals:[],
+    globals: [],
     [groupLocation]: []
   };
   const commentStack = [];
+
   let pendingUriTags = [];
 
   hlsObject.forEach((obj) => {
@@ -60,11 +61,11 @@ const groupPlaylistObject = (hlsObject) => {
 const ungroupPlaylistObject = (hlsObject) => {
   const group = hlsObject.playlists || hlsObject.segments;
 
-  return hlsObject.globals.concat(group.flat());
-}
+  return hlsObject.globals.concat(group?.flat());
+};
 
-export default class M3u8NestedCodec extends M3u8Codec {
-  constructor (mainTagSpec, mainTypeSpec) {
+export default class M3U8NestedCodec extends M3U8Codec {
+  constructor(mainTagSpec, mainTypeSpec) {
     super(mainTagSpec, mainTypeSpec);
   }
 
@@ -81,4 +82,4 @@ export default class M3u8NestedCodec extends M3u8Codec {
 
     return m3u8Data;
   }
-};
+}

@@ -1,24 +1,37 @@
 import { setProperty, getProperty } from '../helpers/props.js';
 
-// Usage:
-// class Foo extends NamedCaptureMixin(FuzzyType, [integer], ['value']) {};
-export const NamedCaptureMixin = (Type, typeCastsArray, captureNamesArray) => class extends Type {
+const mergeArray = (orig, current, dedupeProperty = 'name') => {
+  const output = [...orig];
+
+  current.forEach((el) => {
+    const foundIndex = output.findIndex((o) => o[dedupeProperty] === el[dedupeProperty]);
+
+    if (foundIndex > -1) {
+      output[foundIndex] = el;
+    } else {
+      output.push(el);
+    }
+  });
+
+  return output;
+};
+
+export default (Type, captureNamesArray) => class extends Type {
   #capturePropertyPaths = captureNamesArray.map(c => c.split('.'));
-  #casterArray = typeCastsArray;
   #typeContext;
 
   constructor(typeContext) {
-    super();
+    super(typeContext);
     this.#typeContext = typeContext;
   }
 
   parse(output, str) {
-    const matches = super.parse(str);
+    const matches = [];
+    const consumedChars = super.parse(matches, str);
 
-    if (!matches || matches.length < 1) {
+    if (!matches || matches.length < this.#capturePropertyPaths.length) {
       throw new Error(`Error parsing type "${this.typeContext.type}" from string "${str}".`);
     }
-    const consumedChars = matches.consumedChars;
 
     // Each capture path defines where to place each capture group in the original regex
     this.#capturePropertyPaths.forEach((capturePropertyPath, index) => {
@@ -28,17 +41,20 @@ export const NamedCaptureMixin = (Type, typeCastsArray, captureNamesArray) => cl
       const match = matches[index];
 
       if (match !== undefined) {
-        const matchCaster = this.#casterArray[index];
-        const matchValue = matchCaster.toValue(this.#typeContext, match, index, matches);
+        const origValue = getProperty(output, capturePropertyPath);
 
-        setProperty(output, capturePropertyPath, matchValue);
+        if (Array.isArray(origValue)) {
+          setProperty(output, capturePropertyPath, mergeArray(origValue, match));
+        } else {
+          setProperty(output, capturePropertyPath, match);
+        }
       }
     });
 
     return consumedChars;
   }
 
-  stringify(output, obj) {
+  stringify(obj) {
     const values = [];
 
     this.#capturePropertyPaths.forEach((capturePropertyPath, index) => {
@@ -48,15 +64,7 @@ export const NamedCaptureMixin = (Type, typeCastsArray, captureNamesArray) => cl
         values[index] = value;
       }
     });
-    const matches = values.reduce((matches, match, index) => {
-      const matchCaster = this.#casterArray[index];
-      matches[index] = matchCaster.fromValue(this.#typeContext, match, index, values);
-      return matches;
-    }, []);
-    const stringifiedObj = super.stringify(matches);
 
-    output += stringifiedObj;
-
-    return output;
+    return super.stringify(values);
   }
 };

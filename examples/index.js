@@ -1,68 +1,11 @@
-const { VideojsCodec, M3u8NestedCodec } = require('../');
+/* eslint-disable no-console */
+const M3U8 = require('../');
 
-/*
-import { tagSpec, typeSpec } from './src/hls-spec.js';
+const { VideojsCodec, M3U8NestedCodec, M3U8Codec } = M3U8.codecs;
+const { CastingMixin, NamedPropertyMixin } = M3U8.mixins;
+const { IdentityType } = M3U8.types;
+const { numberCast } = M3U8.casts;
 
-// imports to help me build a new "type"
-import makeValueCodecFactory from './src/codecs/value.js';
-import { makeRegexCodec } from './src/codecs/regexp.js';
-
-const onlyMediaTags = tagSpec.filter((tag) => tag.playlistType !== 'manifest');
-const onlyManifestTags = tagSpec.filter((tag) => tag.playlistType !== 'media');
-
-const mediaPlaylistCodec = makeLineCodec(onlyMediaTags, typeSpec);
-const manifestPlaylistCodec = makeLineCodec(onlyManifestTags, typeSpec);
-
-// Let's add fancy new tags
-mediaPlaylistCodec.setCustomTag({
-  name: '#EXT-X-CUE-IN',
-  type: null,
-  // type: '<attribute-list>',
-  // attributes: [
-  //   { name: 'foo', type: 'not_a_real_type' }
-  // ]
-});
-
-mediaPlaylistCodec.setCustomTag({
-  name: '#EXT-X-CUE-OUT',
-  type: '<decimal-floating-point>'
-});
-
-mediaPlaylistCodec.setCustomType(
-  '<decimal-floating-point-cue-out-cont>',
-  makeValueCodecFactory(
-    makeRegexCodec(/^([0-9]+.?[0-9]*)\/([0-9]+.?[0-9]*)/, (matches) => `${matches[1]}/${matches[2]}`),
-    [parseFloat, parseFloat],
-    ['seconds', 'totalDuration']
-  )
-);
-
-mediaPlaylistCodec.setCustomTag({
-  name: '#EXT-X-CUE-OUT-CONT',
-  type: '<decimal-floating-point-cue-out-cont>'
-}
-// ,
-// {
-//   '<decimal-floating-point-cue-out-cont>': makeValueCodecFactory(
-//     makeRegexCodec(/^([0-9]+.?[0-9]*)\/([0-9]+.?[0-9]*)/, (matches) => `${matches[1]}/${matches[2]}`),
-//     [parseFloat, parseFloat],
-//     ['seconds', 'totalDuration']
-//   )
-// }
-);
-
-// manifestPlaylistCodec.setCustomTag({
-//   name: '#EXT-X-CUE-OUT-CONT',
-//   type: '<decimal-floating-point-cue-out-cont>'
-// });
-
-//Adding a custom attribute to an existing tag
-mediaPlaylistCodec.getTag('#EXT-X-DATERANGE').setCustomAttribute({
-  name: 'X-TEST-ID',
-  type:'<hexadecimal-sequence>',
-  default: '0xDEADBEEF'
-});
-*/
 const test1 = `#EXTM3U
 #EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="audio,lo",LANGUAGE="eng",NAME="English",AUTOSELECT=YES,DEFAULT=YES,URI="englo/prog_index.m3u8"
 #EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="audio,lo",LANGUAGE="fre",NAME="Français",AUTOSELECT=YES,DEFAULT=NO,URI="frelo/prog_index.m3u8"
@@ -79,49 +22,84 @@ lo2/prog_index.m3u8
 #EXT-X-STREAM-INF:PROGRAM-ID=1,BANDWIDTH=591680,CODECS="mp4a.40.2, avc1.64001e",AUDIO="audio-hi"
 hi/prog_index.m3u8
 #EXT-X-STREAM-INF:PROGRAM-ID=1,BANDWIDTH=650000,CODECS="avc1.42e01e,mp4a.40.2",AUDIO="audio-hi"
-hi2/prog_index.m3u8`;
+hi2/prog_index.m3u8\n`;
 
 const test2 = `#EXTM3U
 #EXT-X-TARGETDURATION:10
 #EXT-X-VERSION:4
 #EXT-X-ALLOW-CACHE:YES
 #EXT-X-MEDIA-SEQUENCE:0
+
+# A comment here
 #EXT-X-PROGRAM-DATE-TIME:2012-12-25T14:12:34.123Z
 #EXTINF:10,testing this, thing!""
 #EXT-X-BYTERANGE:522828@0
-hls_450k_video.ts
-#EXTINF:10,
-#EXT-X-BYTERANGE:331444@8021772
-#This is a video segment!
-#This follows the previous comment...
-#EXT-X-DISCONTINUITY
-hls_450k_video.ts
-#EXTINF:1.4167,
-#EXT-X-KEY:METHOD=AES-128,URI="https://priv.example.com/key.php?r=54",IV=0x00000000000000000000014BB69D61E4
-#EXT-X-MAP:URI="main.mp4",BYTERANGE="720@0"
-#EXTINF:6.00600,
-#EXT-X-BYTERANGE:5666510@720
-main.mp4
-#The daterange should be after me!
-#EXT-X-DATERANGE:ID="foo",START-DATE=2012-12-25T14:12:34.123Z,FOO="quoted-string here",BAR=0xABC123,BAZ=1.234
-#EXT-X-BYTERANGE:44556@8353216
-hls_450k_video.ts
-#EXT-X-ENDLIST`;
+#EXT-X-CUE-OUT:20
+hls_450k_video.ts`;
 
-const codec = new VideojsCodec;
+const codec = new M3U8Codec();
+
+/*
+Unfortunately this example isn't babel-fied so we can't rely on classes
+
+If this example WAS run through bable, then we can just do:
+
+class CueOutCont extends IdentityType {
+  regexp = /^([0-9]+.?[0-9]*)\/([0-9]+.?[0-9]*)/;
+
+  stringify(justMatches) {
+    return `${justMatches[0]}/${justMatches[1]}`;
+  }
+}
+*/
+
+function CueOutCont() {
+  this.regexp = /^([0-9]+.?[0-9]*)\/([0-9]+.?[0-9]*)/;
+}
+CueOutCont.prototype = new IdentityType();
+CueOutCont.prototype.stringify = function(justMatches) {
+  return `${justMatches[0]}/${justMatches[1]}`;
+};
+
+codec.setCustomTag({
+  name: '#EXT-X-CUE-IN',
+  type: null,
+  playlistType: 'media',
+  appliesToNextUri: true
+});
+
+codec.setCustomTag({
+  name: '#EXT-X-CUE-OUT',
+  type: '<decimal-floating-point>',
+  playlistType: 'media',
+  appliesToNextUri: true
+});
+
+codec.setCustomTag({
+  name: '#EXT-X-CUE-OUT-CONT',
+  type: '<decimal-floating-point-cue-out-cont>',
+  playlistType: 'media',
+  appliesToNextUri: true
+}, {
+  '<decimal-floating-point-cue-out-cont>': NamedPropertyMixin(CastingMixin(CueOutCont, [numberCast, numberCast]), ['value.seconds', 'value.totalDuration'])
+});
 
 const obj1 = codec.parse(test1);
 const obj2 = codec.parse(test2);
-console.log(JSON.stringify(obj1, null, '  '), '\n');
-console.log(JSON.stringify(obj2, null, '  '), '\n');
+
 const out1 = codec.stringify(obj1);
 const out2 = codec.stringify(obj2);
-console.log('>>', out1, '\n');
-console.log('>>', out2, '\n');
 
-console.log(test1, '\n>>', JSON.stringify(obj1, null, '  '), '\n>>', out1);
-console.log('\n\n');
-console.log(test2, '\n>>', JSON.stringify(obj2, null, '  '), '\n>>', out2);
-
-// console.log(test1 === out1);
-// console.log(test2 === out2);
+console.log('>> Original M3U8 >>');
+console.log(test1);
+console.log('>> Parsed Data >>');
+console.log(JSON.stringify(obj1, null, '  '));
+console.log('>> Stringified Data >>');
+console.log(out1);
+console.log('\n');
+console.log('>> Original M3U8 >>');
+console.log(test2);
+console.log('>> Parsed Data >>');
+console.log(JSON.stringify(obj2, null, '  '));
+console.log('>> Stringified Data >>');
+console.log(out2);

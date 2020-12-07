@@ -53,7 +53,7 @@ export const hexCast = {
   },
   fromValue: (ctx, value, index, valuesArray) => {
     const byteArray = new Uint8Array(value);
-    const stringValue = byteArray.reduce((p, c) => p + c.toString(16), '0x');
+    const stringValue = byteArray.reduce((p, c) => p + c.toString(16).padStart(2, '0'), '0x');
 
     return stringValue;
   }

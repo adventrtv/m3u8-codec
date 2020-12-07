@@ -7,12 +7,17 @@ const path = require('path');
 const basePath = path.resolve(__dirname, '..');
 const testDataDir = path.join(basePath, 'test');
 const manifestDir = path.join(basePath, 'test', 'fixtures', 'm3u8');
+
 const manifestFilepath = path.join(testDataDir, 'dist', 'test-manifests.js');
 const expectedFilepath = path.join(testDataDir, 'dist', 'test-expected.js');
+const outFilepath = path.join(testDataDir, 'dist', 'test-output.js');
 
 const build = function() {
   let manifests = 'export default {\n';
+
   let expected = 'export default {\n';
+
+  let out = 'export default {\n';
 
   const files = fs.readdirSync(manifestDir);
 
@@ -37,10 +42,21 @@ const build = function() {
       expected += '  "' + path.basename(file, '.json') + '": ';
       expected += fs.readFileSync(file, 'utf8');
       expected += ',\n';
+    } else if (extname === '.out') {
+      // translate this manifest
+      out += '  \'' + path.basename(file, '.out') + '\': ';
+      out += fs.readFileSync(file, 'utf8')
+        .split(/\r\n|\n/)
+        // quote and concatenate
+        .map(function(line) {
+          return '    \'' + line + '\\n\' +\n';
+        }).join('')
+        // strip leading spaces and the trailing '+'
+        .slice(4, -3);
+      out += ',\n';
     } else {
       console.log('Unknown file ' + file + ' found in manifest dir ' + manifestDir);
     }
-
   }
 
   // clean up and close the objects
@@ -48,11 +64,15 @@ const build = function() {
   manifests += '\n};\n';
   expected = expected.slice(0, -2);
   expected += '\n};\n';
+  out = out.slice(0, -2);
+  out += '\n};\n';
 
   fs.writeFileSync(manifestFilepath, manifests);
   fs.writeFileSync(expectedFilepath, expected);
+  fs.writeFileSync(outFilepath, out);
   console.log('Wrote test data file ' + manifestFilepath);
   console.log('Wrote test data file ' + expectedFilepath);
+  console.log('Wrote test data file ' + outFilepath);
 };
 
 const watch = function() {
@@ -71,6 +91,11 @@ const clean = function() {
   }
   try {
     fs.unlinkSync(expectedFilepath);
+  } catch (e) {
+    console.log(e);
+  }
+  try {
+    fs.unlinkSync(outFilepath);
   } catch (e) {
     console.log(e);
   }
