@@ -290,23 +290,47 @@ QUnit.module('Fixtures', {
       const expected = testDataExpected[key];
       const output = testDataOutputs[key];
 
-      QUnit.test(`${key}.m3u8`, function(assert) {
-        const result = this.videojsCodec.parse(manifest);
+      QUnit.module('Parsing Tests', {
+        before() {
+          this.videojsCodec = new VideojsCodec();
+          this.videojsCodec.setCustomTag({
+            name: '#ZEN-TOTAL-DURATION',
+            type: '<decimal-floating-point>'
+          });
+        }
+      }, () => {
+        QUnit.test(`${key}.m3u8`, function(assert) {
+          const result = this.videojsCodec.parse(manifest);
 
-        assert.deepEqualWithExtra(
-          result,
-          expected,
-          key + '.m3u8 was parsed correctly'
-        );
-        const manifestComparable = makeComparableArrays(output || manifest);
-        const serialized = this.videojsCodec.stringify(result);
-        const serializedComparable = makeComparableArrays(serialized);
+          assert.deepEqualWithExtra(
+            result,
+            expected,
+            key + '.m3u8 was parsed correctly'
+          );
+        });
+      });
 
-        assert.arrayEqualWithExtra(
-          serializedComparable,
-          manifestComparable,
-          key + '.m3u8 was parsed correctly'
-        );
+      QUnit.module('Stringify Tests', {
+        before() {
+          this.videojsCodec = new VideojsCodec();
+          this.videojsCodec.setCustomTag({
+            name: '#ZEN-TOTAL-DURATION',
+            type: '<decimal-floating-point>'
+          });
+        }
+      }, () => {
+        QUnit.test(`${key}.m3u8`, function(assert) {
+          const result = this.videojsCodec.parse(manifest);
+          const manifestComparable = makeComparableArrays(output || manifest);
+          const serialized = this.videojsCodec.stringify(result);
+          const serializedComparable = makeComparableArrays(serialized);
+
+          assert.arrayEqualWithExtra(
+            serializedComparable,
+            manifestComparable,
+            key + '.m3u8 was parsed correctly'
+          );
+        });
       });
     });
   });
