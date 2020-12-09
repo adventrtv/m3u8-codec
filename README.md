@@ -334,11 +334,12 @@ const codec = new VideojsCodec();
 
 const parsed = codec.parse(`#EXTM3U
 #EXT-X-TARGETDURATION:10
+#A global comment here...
 #EXT-X-VERSION:4
 #EXT-X-ALLOW-CACHE:YES
 #EXT-X-MEDIA-SEQUENCE:0
 
-# A comment here
+# A segment comment here...
 #EXT-X-PROGRAM-DATE-TIME:2012-12-25T14:12:34.123Z
 #EXTINF:10,testing this, thing!""
 #EXT-X-BYTERANGE:522828@0
@@ -360,9 +361,15 @@ hls_450k_video.ts`);
             length: 522828,
             offset: 0
         },
+        comments: [
+          '# A segment comment here...'
+        ],
         cueOut: 20,
         uri: 'hls_450k_video.ts'
     }],
+    comments: [
+      '#A global comment here...'
+    ],
     targetDuration: 10,
     version: 4,
     mediaSequence: 0,
@@ -379,22 +386,24 @@ const string = codec.stringify(parsed);
 
 // string =>
 `#EXTM3U
+#A global comment here...
 #EXT-X-VERSION:4
 #EXT-X-TARGETDURATION:10
 #EXT-X-MEDIA-SEQUENCE:0
 #EXT-X-DISCONTINUITY-SEQUENCE:0
 #EXT-X-ALLOW-CACHE:YES
+# A segment comment here...
 #EXTINF:10,
 #EXT-X-BYTERANGE:522828@0
 #EXT-X-PROGRAM-DATE-TIME:2012-12-25T14:12:34.123Z
 #EXT-X-CUE-OUT:20
 hls_450k_video.ts`
 ```
-NOTE: Empty lines and comments have been removed from output. The order of tags is not preserved.
+NOTE: Empty lines have been removed from output. The order of tags and comments is not preserved.
 
 ## TODO
-1. Validation: The bones are all there for a more strict validator. Each tag definition has `minVersion` `maxVersion`, `allowed` and/or `required` as applicable. Just need to run a validation pass once the parsing is complete.
-2.
+  1. Validation: The bones are all there for a more strict validator. Each tag definition has `minVersion` `maxVersion`, `allowed` and/or `required` as applicable. Just need to run a validation pass once the parsing is complete.
+  2.
 
 
 ## License
