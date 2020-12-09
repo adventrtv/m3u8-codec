@@ -1,4 +1,8 @@
 import { tagSpec, typeSpec } from '../hls.js';
+import { IdentityType } from '../types/regexp-types.js';
+import CastingMixin from '../types/casting-mixin.js';
+import NamedPropertyMixin from '../types/named-property-mixin.js';
+import { identity, uriCast } from '../types/type-casts.js';
 
 // Build a new instance of tag
 // Tags copy most of the properties from the tagSpec but are missing the
@@ -21,10 +25,14 @@ const createBaseInstance = (tag) => (options = { verbose: false }) => {
     }
   });
 
-  newTag.value = null;
+  if (baseProperties.type) {
+    newTag.value = null;
+  }
 
   return newTag;
 };
+
+const noop = ()=>{};
 
 const createTagInstance = (tag) => {
   const createInstance = createBaseInstance(tag);
@@ -54,7 +62,7 @@ const createTagInstance = (tag) => {
 
 const generateTagMapElement = (typeSpecData) => {
   const attributeElementGenerator = (parentTag) => (attrType) => {
-    if (attrType.type !== null) {
+    if (attrType.type) {
       const AttrTypeSpec = typeSpecData[attrType.type];
 
       if (!AttrTypeSpec) {
@@ -65,7 +73,11 @@ const generateTagMapElement = (typeSpecData) => {
 
       attrType.parse = (...args) => attrCodec.parse(...args);
       attrType.stringify = (...args) => attrCodec.stringify(...args);
+    } else {
+      attrType.parse = noop;
+      attrType.stringify = noop;
     }
+
     attrType.createInstance = createBaseInstance(attrType);
 
     return [attrType.name, attrType];
@@ -75,7 +87,7 @@ const generateTagMapElement = (typeSpecData) => {
     const tagObject = Object.assign({}, tagType);
     const attrTypes = tagType.attributes;
 
-    if (tagType.type !== null) {
+    if (tagType.type) {
       const TagTypeSpec = typeSpecData[tagType.type];
 
       if (!TagTypeSpec) {
@@ -85,8 +97,17 @@ const generateTagMapElement = (typeSpecData) => {
       const tagCodec = new TagTypeSpec(tagObject);
 
       tagObject.parse = (...args) => tagCodec.parse(...args);
-      tagObject.stringify = (...args) => tagCodec.stringify(...args);
+
+      if (tagType.noTagNamePrefix) {
+        tagObject.stringify = (...args) => tagCodec.stringify(...args);
+      } else {
+        tagObject.stringify = (...args) => `${tagObject.name}:${tagCodec.stringify(...args)}`;
+      }
+    } else {
+      tagObject.parse = noop;
+      tagObject.stringify = (...args) => `${tagObject.name}`;
     }
+
     tagObject.createInstance = createTagInstance(tagObject);
 
     if (attrTypes) {
@@ -114,12 +135,62 @@ export default class LineCodec {
   #serializeTag;
 
   constructor(mainTagSpec = tagSpec, mainTypeSpec = typeSpec) {
-    this.#localTypeSpec = Object.create(mainTypeSpec);
+    const tempTagSpec = [...mainTagSpec,
+      // SPECIAL TAGS
+      {
+        name: 'comment',
+        type: '<comment-line>',
+        playlistType: 'both',
+        description: 'A comment.',
+        noTagNamePrefix: true
+      }, {
+        name: 'empty',
+        type: '<empty-line>',
+        playlistType: 'both',
+        description: 'An empty line',
+        noTagNamePrefix: true
+      }, {
+        name: 'uri',
+        type: '<uri-line>',
+        playlistType: 'both',
+        description: 'A URI',
+        noTagNamePrefix: true
+      }
+    ];
+    this.#localTypeSpec = {...mainTypeSpec,
+      '<comment-line>': NamedPropertyMixin(CastingMixin(IdentityType, [identity]), ['value']),
+      '<empty-line>': NamedPropertyMixin(CastingMixin(IdentityType, [identity]), ['value']),
+      '<uri-line>': NamedPropertyMixin(CastingMixin(IdentityType, [uriCast]), ['value'])
+    };
+
     this.#defaultTagMapElementGenerator = generateTagMapElement(this.#localTypeSpec);
     // Build O(1) lookup table(s) from spec
-    this.#tagSpecMap = new Map(mainTagSpec.map(this.#defaultTagMapElementGenerator));
+    this.#tagSpecMap = new Map(tempTagSpec.map(this.#defaultTagMapElementGenerator));
 
     this.#parseTag = (input) => {
+      const trimmedInput = input.trim();
+
+      if (trimmedInput.length === 0) {
+        // We found an empty-line!
+        const outputTagSpec = this.#tagSpecMap.get('empty')
+        const outputTag = outputTagSpec.createInstance();
+        outputTagSpec.parse(outputTag, input);
+
+        return outputTag;
+      }
+
+      const hasHash = input.indexOf('#') === 0;
+
+      if (!hasHash) {
+        // Consider this case a uri-line
+        // TODO: Validation?
+        const outputTagSpec = this.#tagSpecMap.get('uri');
+        const outputTag = outputTagSpec.createInstance();
+        outputTagSpec.parse(outputTag, input);
+
+        return outputTag;
+      }
+
       const firstColon = input.indexOf(':');
 
       let tagName = input;
@@ -130,46 +201,37 @@ export default class LineCodec {
         tagName = input.slice(0, firstColon);
         tagValue = input.slice(firstColon + 1);
       }
-      const tagSpecData = this.#tagSpecMap.get(tagName);
+      let tagSpecData = this.#tagSpecMap.get(tagName);
 
       if (!tagSpecData) {
-        return {
-          lineType: 'comment',
-          value: input
-        };
-        // throw new Error(`Found unknown tag "${tagName}".`);
+        // OK, it's almost certainly a comment or an unknown tag which we treat as a comment
+        tagName = 'comment';
+        tagValue = input;
+        tagSpecData = this.#tagSpecMap.get(tagName);
       }
-      const output = tagSpecData.createInstance();
 
-      // TODO: Stop special-casing type null?
-      if (tagSpecData.type === null && tagValue !== '') {
+      if (tagSpecData.type && tagValue === '') {
+        throw new Error(`Tag "${tagSpecData.name}" has a value but none were found.`);
+      } else if (!tagSpecData.type && tagValue !== '') {
         throw new Error(`Tag "${tagSpecData.name}" has no value but found "${tagValue}".`);
       }
 
-      if (tagSpecData.type !== null && tagValue === '') {
-        throw new Error(`Tag "${tagSpecData.name}" has a value but none were found.`);
+      if (!tagSpecData) {
+        throw new Error(`Found unknown tag "${tagName}".`);
       }
 
-      if (tagValue !== '') {
-        tagSpecData.parse(output, tagValue);
-      }
+      const output = tagSpecData.createInstance();
 
-      output.lineType = 'tag';
+      tagSpecData.parse(output, tagValue);
 
       return output;
     };
 
     this.#serializeTag = (lineObj) => {
       const tagSpecData = this.#tagSpecMap.get(lineObj.name);
+      if (tagSpecData === undefined) console.log(lineObj);
 
-      // TODO: Stop special-casing type null?
-      if (tagSpecData.type !== null) {
-        const valueString = tagSpecData.stringify(lineObj);
-
-        return `${lineObj.name}:${valueString}`;
-      }
-
-      return `${lineObj.name}`;
+      return tagSpecData.stringify(lineObj);
     };
   }
 
@@ -196,41 +258,13 @@ export default class LineCodec {
   }
 
   parse(lineStr) {
-    if (lineStr.indexOf('#') === 0) {
-      // Found a tag or comment!
-      return this.#parseTag(lineStr);
-    } else if (lineStr.trim().length === 0) {
-      // Empty line
-      return {
-        lineType: 'empty'
-      };
-    }
-    // URI!
-    return {
-      lineType: 'uri',
-      value: lineStr.trim()
-    };
+    return this.#parseTag(lineStr);
   }
 
   stringify(lineObj) {
-    let str;
-
     if (!lineObj) {
       return;
     }
-
-    switch (lineObj.lineType) {
-    case 'tag':
-      str = this.#serializeTag(lineObj);
-      break;
-    case 'empty':
-      str = '';
-      break;
-    default:
-      str = lineObj.value;
-      break;
-    }
-
-    return str;
+    return this.#serializeTag(lineObj);
   }
 }

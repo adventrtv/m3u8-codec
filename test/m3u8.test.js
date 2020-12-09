@@ -16,8 +16,7 @@ QUnit.module('Line-Codec', () => {
     before() {
       this.simpleTag = [
         {
-          name: '#EXT-TAG',
-          type: null
+          name: '#EXT-TAG'
         }
       ];
     },
@@ -29,10 +28,7 @@ QUnit.module('Line-Codec', () => {
       const data = this.lineCodec.parse('#EXT-TAG');
 
       assert.deepEqual(data, {
-        name: '#EXT-TAG',
-        type: null,
-        value: null,
-        lineType: 'tag'
+        name: '#EXT-TAG'
       });
     });
 
@@ -50,19 +46,34 @@ QUnit.module('Line-Codec', () => {
     QUnit.test('Unknown TAGS are treated as comments', function(assert) {
       const output = this.lineCodec.parse('#EXT-FOO');
 
-      assert.deepEqual(output, {lineType: 'comment', value: '#EXT-FOO'});
+      assert.deepEqual(output, {
+        name: 'comment',
+        type: '<comment-line>',
+        playlistType: 'both',
+        value: '#EXT-FOO'
+      });
     });
 
     QUnit.test('Lines starting with a # but not #EXT are interpreted as comments', function(assert) {
       const data = this.lineCodec.parse('#FOO');
 
-      assert.deepEqual(data, {lineType: 'comment', value: '#FOO'});
+      assert.deepEqual(data, {
+        name: 'comment',
+        type: '<comment-line>',
+        playlistType: 'both',
+        value: '#FOO'
+      });
     });
 
     QUnit.test('TAG name is case sensitive', function(assert) {
       const data = this.lineCodec.parse('#ext-tag');
 
-      assert.deepEqual(data, {lineType: 'comment', value: '#ext-tag'});
+      assert.deepEqual(data, {
+        name: 'comment',
+        type: '<comment-line>',
+        playlistType: 'both',
+        value: '#ext-tag'
+      });
     });
 
     QUnit.test('Custom TAGS can be added after codec initialization', function(assert) {
@@ -75,8 +86,6 @@ QUnit.module('Line-Codec', () => {
       assert.deepEqual(data, {
         name: '#EXT-FOO',
         type: null,
-        value: null,
-        lineType: 'tag',
         playlistType: 'both',
         isCustom: true
       });
@@ -115,8 +124,7 @@ QUnit.module('Line-Codec', () => {
       assert.deepEqual(data, {
         name: '#EXT-TAG',
         type: 'string',
-        value: 'foo',
-        lineType: 'tag'
+        value: 'foo'
       });
     });
 
@@ -134,7 +142,12 @@ QUnit.module('Line-Codec', () => {
     QUnit.test('Unknown TAGS are treated as comments', function(assert) {
       const output = this.lineCodec.parse('#EXT-FOO');
 
-      assert.deepEqual(output, {lineType: 'comment', value: '#EXT-FOO'});
+      assert.deepEqual(output, {
+        name: 'comment',
+        type: '<comment-line>',
+        playlistType: 'both',
+        value: '#EXT-FOO'
+      });
     });
 
     QUnit.test('Custom TAG types can be added after codec initialization', function(assert) {
@@ -149,7 +162,6 @@ QUnit.module('Line-Codec', () => {
         name: '#EXT-FOO',
         type: 'bar',
         value: '123',
-        lineType: 'tag',
         playlistType: 'both',
         isCustom: true
       });

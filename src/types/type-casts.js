@@ -27,9 +27,8 @@ export const dateCast = {
   fromValue: (ctx, value, index, valuesArray) => value.toISOString()
 };
 
-export const numberCast = {
-  toValue: (ctx, value, index, valuesArray) => parseFloat(value),
-  fromValue: (ctx, value, index, valuesArray) => value
+export const numberCast = { ...identity,
+  toValue: (ctx, value, index, valuesArray) => parseFloat(value)
 };
 
 export const hexCast = {
@@ -57,4 +56,8 @@ export const hexCast = {
 
     return stringValue;
   }
+};
+
+export const uriCast = { ...identity,
+  toValue: (ctx, value, index, valuesArray) => typeof value === 'string' ? value.trim() : value,
 };

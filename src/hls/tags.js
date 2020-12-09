@@ -10,7 +10,6 @@ const tagSpec = [
   // BASIC TAGS
   {
     name: '#EXTM3U',
-    type: null,
     required: true,
     playlistType: 'both',
     description: 'The EXTM3U tag indicates that the file is an Extended M3U [M3U] Playlist file.  It MUST be the first line of every Media Playlist and every Master Playlist.'
@@ -45,7 +44,6 @@ const tagSpec = [
 
   {
     name: '#EXT-X-DISCONTINUITY',
-    type: null,
     playlistType: 'media',
     appliesToNextUri: true,
     description: 'The EXT-X-DISCONTINUITY tag indicates a discontinuity between the Media Segment that follows it and the one that preceded it.'
@@ -221,7 +219,6 @@ const tagSpec = [
 
   {
     name: '#EXT-X-ENDLIST',
-    type: null,
     playlistType: 'media',
     description: 'The EXT-X-ENDLIST tag indicates that no more Media Segments will be added to the Media Playlist file.  It MAY occur anywhere in the Media Playlist file.'
   },
@@ -239,7 +236,6 @@ const tagSpec = [
 
   {
     name: '#EXT-X-I-FRAMES-ONLY',
-    type: null,
     playlistType: 'media',
     description: 'The EXT-X-I-FRAMES-ONLY tag indicates that each Media Segment in the Playlist describes a single I-frame.  I-frames are encoded video frames whose encoding does not depend on any other frame.  I-frame Playlists can be used for trick play, such as fast forward, rapid reverse, and scrubbing.'
   },
@@ -573,7 +569,6 @@ const tagSpec = [
   // BOTH
   {
     name: '#EXT-X-INDEPENDENT-SEGMENTS',
-    type: null,
     playlistType: 'both',
     description: 'The EXT-X-INDEPENDENT-SEGMENTS tag indicates that all media samples in a Media Segment can be decoded without information from other segments.  It applies to every Media Segment in the Playlist.'
   },
@@ -601,7 +596,7 @@ const tagSpec = [
     ],
     playlistType: 'both',
     description: 'The EXT-X-START tag indicates a preferred point at which to start playing a Playlist.  By default, clients SHOULD start playback at this point when beginning a playback session.'
-  }
+  },
 ];
 
 export default tagSpec;

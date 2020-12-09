@@ -47,7 +47,6 @@ codec.parse('#EXT-X-DATERANGE:ID="foo",START-DATE=2012-12-25T14:12:34.123Z,FOO="
       value: 'quoted-string, here'
     }
   ]
-  lineType: 'tag'
 }
 ```
 
@@ -75,7 +74,7 @@ codec.parse(`#EXTM3U
 #EXT-X-VERSION:4
 #EXT-X-ALLOW-CACHE:YES
 #EXT-X-MEDIA-SEQUENCE:0
-
+\t
 # A comment here
 #EXT-X-PROGRAM-DATE-TIME:2012-12-25T14:12:34.123Z
 #EXTINF:10,testing this, thing!""
@@ -87,45 +86,41 @@ hls_450k_video.ts`);
 [
   {
     name: '#EXTM3U',
-    type: null,
-    playlistType: 'both',
-    value: null,
-    lineType: 'tag'
+    playlistType: 'both'
   },
   {
     name: '#EXT-X-TARGETDURATION',
     type: '<decimal-integer>',
     playlistType: 'media',
-    value: 10,
-    lineType: 'tag'
+    value: 10
   },
   {
     name: '#EXT-X-VERSION',
     type: '<decimal-integer>',
     playlistType: 'both',
-    value: 4,
-    lineType: 'tag'
+    value: 4
   },
   {
     name: '#EXT-X-ALLOW-CACHE',
     type: '<enumerated-string>',
     playlistType: 'media',
     maxVersion: 6,
-    value: 'YES',
-    lineType: 'tag'
+    value: 'YES'
   },
   {
     name: '#EXT-X-MEDIA-SEQUENCE',
     type: '<decimal-integer>',
     playlistType: 'media',
-    value: 0,
-    lineType: 'tag'
+    value: 0
   },
   {
-    lineType: 'empty'
+    name: 'empty',
+    type: '<empty-line>',
+    value: '\t'
   },
   {
-    lineType: 'comment',
+    name: 'comment',
+    type: '<comment-line>',
     value: '# A comment here'
   },
   {
@@ -133,8 +128,7 @@ hls_450k_video.ts`);
     type: '<date-time-msec>',
     playlistType: 'media',
     appliesToNextUri: true,
-    value: new Date('2012-12-25T14:12:34.123Z'),
-    lineType: 'tag'
+    value: new Date('2012-12-25T14:12:34.123Z')
   },
   {
     name: '#EXTINF',
@@ -144,8 +138,7 @@ hls_450k_video.ts`);
     value: {
       'duration': 10,
       'title': 'testing this, thing!""'
-    },
-    lineType: 'tag'
+    }
   },
   {
     name: '#EXT-X-BYTERANGE',
@@ -156,8 +149,7 @@ hls_450k_video.ts`);
     value: {
       length: 522828,
       offset: 0
-    },
-    lineType: 'tag'
+    }
   },
   {
     name: '#EXT-X-CUE-OUT',
@@ -165,11 +157,11 @@ hls_450k_video.ts`);
     playlistType: 'media',
     appliesToNextUri: true,
     isCustom: true,
-    value: 20,
-    lineType: 'tag'
+    value: 20
   },
   {
-    lineType: 'uri',
+    name: 'uri',
+    type: '<uri-line>',
     value: 'hls_450k_video.ts'
   }
 ]
@@ -186,7 +178,7 @@ const string = codec.stringify(parsed);
 #EXT-X-VERSION:4
 #EXT-X-ALLOW-CACHE:YES
 #EXT-X-MEDIA-SEQUENCE:0
-
+\t
 # A comment here
 #EXT-X-PROGRAM-DATE-TIME:2012-12-25T14:12:34.123Z
 #EXTINF:10,testing this, thing!""
@@ -195,6 +187,7 @@ const string = codec.stringify(parsed);
 hls_450k_video.ts
 #EXT-X-DISCONTINUITY-SEQUENCE:0`
 ```
+NOTE: An `#EXT-X-DISCONTINUITY-SEQUENCE` tag was added because it has a default value if one isn't provided.
 
 ### M3U8NestedCodec _extends M3U8Codec_
 `M3U8NestedCodec` further processes the line-objects and produces a more meaningful representation. Tags are grouped into sets based on their purpose. All global tags are collected and stored, in order. All `uri` lines and any tags that relate to those `uri`s are also collected into individual arrays - again preserving order. Comments are intelligently collected along with the tags they precede and end up in either the global or per-playlist/per-segment collections.
@@ -212,7 +205,7 @@ codec.parse(`#EXTM3U
 #EXT-X-VERSION:4
 #EXT-X-ALLOW-CACHE:YES
 #EXT-X-MEDIA-SEQUENCE:0
-
+\t
 # A comment here
 #EXT-X-PROGRAM-DATE-TIME:2012-12-25T14:12:34.123Z
 #EXTINF:10,testing this, thing!""
@@ -226,51 +219,43 @@ hls_450k_video.ts`);
   globals: [
     {
       name: '#EXTM3U',
-      type: null,
-      playlistType: 'both',
-      value: null,
-      lineType: 'tag'
-    },
+      playlistType: 'both'
     {
       name: '#EXT-X-TARGETDURATION',
       type: '<decimal-integer>',
       playlistType: 'media',
-      value: 10,
-      lineType: 'tag'
+      value: 10
     },
     {
       name: '#EXT-X-VERSION',
       type: '<decimal-integer>',
       playlistType: 'both',
-      value: 4,
-      lineType: 'tag'
+      value: 4
     },
     {
       name: '#EXT-X-ALLOW-CACHE',
       type: '<enumerated-string>',
       playlistType: 'media',
       maxVersion: 6,
-      value: 'YES',
-      lineType: 'tag'
+      value: 'YES'
     },
     {
       name: '#EXT-X-MEDIA-SEQUENCE',
       type: '<decimal-integer>',
       playlistType: 'media',
-      value: 0,
-      lineType: 'tag'
+      value: 0
     },
     {
       name: '#EXT-X-DISCONTINUITY-SEQUENCE',
       type: '<decimal-integer>',
-      value: 0,
-      lineType: 'tag'
+      value: 0
     }
   ],
   segments: [
     [
       {
-        lineType: 'comment',
+        name: 'comment',
+        type: '<comment-line>',
         value: '# A comment here'
       },
       {
@@ -278,8 +263,7 @@ hls_450k_video.ts`);
         type: '<date-time-msec>',
         playlistType: 'media',
         appliesToNextUri: true,
-        value: new Date('2012-12-25T14:12:34.123Z'),
-        lineType: 'tag'
+        value: new Date('2012-12-25T14:12:34.123Z')
       },
       {
         name: '#EXTINF',
@@ -289,8 +273,7 @@ hls_450k_video.ts`);
         value: {
           duration: 10,
           title: 'testing this, thing!""'
-        },
-        lineType: 'tag'
+        }
       },
       {
         name: '#EXT-X-BYTERANGE',
@@ -301,8 +284,7 @@ hls_450k_video.ts`);
         value: {
           length: 522828,
           offset: 0
-        },
-        lineType: 'tag'
+        }
       },
       {
         name: '#EXT-X-CUE-OUT',
@@ -310,11 +292,11 @@ hls_450k_video.ts`);
         playlistType: 'media',
         appliesToNextUri: true,
         isCustom: true,
-        value: 20,
-        lineType: 'tag'
+        value: 20
       },
       {
-        lineType: 'uri',
+        name: 'uri',
+        type: '<uri-line>',
         value: 'hls_450k_video.ts'
       }
     ]
@@ -341,6 +323,7 @@ const string = codec.stringify(parsed);
 #EXT-X-CUE-OUT:20
 hls_450k_video.ts`
 ```
+NOTE: Empty lines have been removed from the output.
 
 ### VideojsCodec _extends M3U8NestedCodec_
 `VideojsCodec` is a m3u8-parser compatible output format. The format is extremely terse but results in a huge loss of context. The reconstructed output is functionally identical to the input but will have lost all comments and sequence. Certain optimizations (like byte-range shorthand) will be missing if they were present in the input.
@@ -407,6 +390,8 @@ const string = codec.stringify(parsed);
 #EXT-X-CUE-OUT:20
 hls_450k_video.ts`
 ```
+NOTE: Empty lines and comments have been removed from output. The order of tags is not preserved.
+
 ## TODO
 1. Validation: The bones are all there for a more strict validator. Each tag definition has `minVersion` `maxVersion`, `allowed` and/or `required` as applicable. Just need to run a validation pass once the parsing is complete.
 2.

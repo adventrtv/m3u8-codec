@@ -5,7 +5,7 @@ import { tagSpec } from '../hls.js';
 
 const detectPlaylistType = (arr) => {
   const {manifest, media} = arr.reduce((results, line) => {
-    if (line.lineType === 'tag' && line.playlistType !== 'both') {
+    if (line.playlistType !== 'both') {
       results[line.playlistType]++;
     }
     return results;
@@ -39,8 +39,7 @@ const addDefaults = (hlsObject) => {
     const newTag = {
       name: missingTag.name,
       type: missingTag.type,
-      value: missingTag.default,
-      lineType: 'tag'
+      value: missingTag.default
     };
 
     hlsObject.push(newTag);

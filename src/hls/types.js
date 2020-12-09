@@ -82,6 +82,18 @@ const typeSensitiveCast = {
 
 const HLSType = (Type, typeCastsArray, captureNamesArray) => NamedPropertyMixin(CastingMixin(Type, typeCastsArray), captureNamesArray);
 
+class NullType extends IdentityType {
+  regexp = null;
+
+  parse() {
+    return super.parse('');
+  }
+
+  stringify() {
+    return super.stringify([]);
+  }
+}
+
 // Types specified in the HLS spec (plus a few convenient types _implied_ by the spec)
 export default {
   '<decimal-integer>': HLSType(IntegerType, [numberCast], ['value']),
@@ -101,5 +113,6 @@ export default {
   '<decimal-integer-duration>': HLSType(DurationType, [numberCast, identity], ['value.duration', 'value.title']),
   '<attribute-list>': HLSType(AttributeType, [identity], ['value']),
   '<unknown-type>': HLSType(FuzzyType, [typeSensitiveCast, dataTypeToHLSType], ['value', 'type']),
-  '<everything>': HLSType(IdentityType, [identity], ['value'])
+  '<everything>': HLSType(IdentityType, [identity], ['value']),
+  '<null>': NullType
 };

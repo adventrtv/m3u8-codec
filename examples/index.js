@@ -28,16 +28,27 @@ const test2 = `#EXTM3U
 #EXT-X-TARGETDURATION:10
 #EXT-X-VERSION:4
 #EXT-X-ALLOW-CACHE:YES
+#This is a global comment, the worst kind of comment
+#because it can't be reconstructed in any way that makes sense!
 #EXT-X-MEDIA-SEQUENCE:0
-
-# A comment here
+\t
+#A comment here
 #EXT-X-PROGRAM-DATE-TIME:2012-12-25T14:12:34.123Z
 #EXTINF:10,testing this, thing!""
 #EXT-X-BYTERANGE:522828@0
-#EXT-X-CUE-OUT:20
+#EXT-X-CUE-OUT:10
+hls_450k_video.ts
+
+#Another random comment...
+# Line two!
+#EXT-X-DATERANGE:ID="foo",START-DATE=2012-12-25T14:12:34.123Z,FOO="quoted-string, here"
+#EXT-X-PROGRAM-DATE-TIME:2012-12-25T14:22:34.123Z
+#EXTINF:10,
+#EXT-X-BYTERANGE:1000000@522828
+#EXT-X-CUE-IN
 hls_450k_video.ts`;
 
-const codec = new M3U8Codec();
+const codec = new VideojsCodec();
 
 /*
 Unfortunately this example isn't babel-fied so we can't rely on classes
@@ -63,7 +74,6 @@ CueOutCont.prototype.stringify = function(justMatches) {
 
 codec.setCustomTag({
   name: '#EXT-X-CUE-IN',
-  type: null,
   playlistType: 'media',
   appliesToNextUri: true
 });

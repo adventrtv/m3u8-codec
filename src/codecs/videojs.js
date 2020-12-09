@@ -18,8 +18,6 @@ const createTagFactory = (videoJsCodec) => {
     const tagType = videoJsCodec.getTag(tagName);
     const tag = tagType.createInstance();
 
-    tag.lineType = 'tag';
-
     if (typeOverride) {
       tag.type = typeOverride;
     }
@@ -80,6 +78,12 @@ const toGlobalTags = (globals) => {
         precise: findAttr(tag, 'PRECISE')?.value === 'YES'
       };
       break;
+    case 'comment':
+      if (!output.comments) {
+        output.comments = [];
+      }
+      output.comments.push(tag.value);
+      break;
     }
     if (tag.isCustom) {
       setProperty(output, ['custom', camelCaseTag(tag.name)], tag.value);
@@ -109,6 +113,15 @@ const fromGlobalTags = (createTag, videojsObj) => {
 
   if (videojsObj.endList) {
     mapping.push(['#EXT-X-ENDLIST', null]);
+  }
+
+  if (videojsObj.comments) {
+    videojsObj.comments.forEach((comment) => {
+      const tag = createTag('comment');
+
+      tag.value = comment;
+      output.globals.push(tag);
+    });
   }
 
   if (videojsObj.start) {
@@ -170,7 +183,7 @@ const toMediaGroups = (videojsObj, globals) => {
   const mediaGroups = videojsObj.mediaGroups;
 
   globals.forEach((tag) => {
-    if (tag.lineType === 'tag' && tag.name === '#EXT-X-MEDIA') {
+    if (tag.name === '#EXT-X-MEDIA') {
       const objType = findAttr(tag, 'TYPE')?.value;
       const objGroupId = findAttr(tag, 'GROUP-ID')?.value;
       const objName = findAttr(tag, 'NAME')?.value;
@@ -274,25 +287,25 @@ const toPlaylists = (videojsObj, playlists) => {
     };
 
     playlistArr.forEach((tag) => {
-      if (tag.lineType === 'uri') {
+      if (tag.name === 'uri') {
         currentObj.uri = tag.value;
-      } else if (tag.lineType === 'tag') {
-        switch (tag.name) {
-        case '#EXT-X-STREAM-INF':
-          currentObj.attributes = {};
+        return;
+      }
+      switch (tag.name) {
+      case '#EXT-X-STREAM-INF':
+        currentObj.attributes = {};
 
-          tag.value.forEach((attribute) => {
-            if (dumbStringProperties.indexOf(attribute.name) !== -1) {
-              currentObj.attributes[attribute.name] = attribute.value + '';
-            } else {
-              currentObj.attributes[attribute.name] = attribute.value;
-            }
-          });
-          break;
-        case '#EXT-X-I-FRAME-STREAM-INF':
-          // TODO: Support #EXT-X-I-FRAME-STREAM-INF
-          break;
-        }
+        tag.value.forEach((attribute) => {
+          if (dumbStringProperties.indexOf(attribute.name) !== -1) {
+            currentObj.attributes[attribute.name] = attribute.value + '';
+          } else {
+            currentObj.attributes[attribute.name] = attribute.value;
+          }
+        });
+        break;
+      case '#EXT-X-I-FRAME-STREAM-INF':
+        // TODO: Support #EXT-X-I-FRAME-STREAM-INF
+        break;
       }
     });
 
@@ -324,12 +337,11 @@ const fromPlaylists = (createTag, output, videojsObj) => {
       }
       streamInf.value.push(attr);
     });
+    const uriObj = createTag('uri');
 
+    uriObj.value = playlistEntry.uri;
     output.playlists.push(streamInf);
-    output.playlists.push({
-      lineType: 'uri',
-      value: playlistEntry.uri
-    });
+    output.playlists.push(uriObj);
   });
 };
 
@@ -401,88 +413,111 @@ const toSegments = (videojsObj, segments) => {
     currentObj.duration = videojsObj.targetDuration;
 
     segmentArr.forEach((tag) => {
-      if (tag.lineType === 'uri') {
+      if (tag.name === 'uri') {
         currentObj.uri = tag.value;
-      } else if (tag.lineType === 'tag') {
-        switch (tag.name) {
-        case '#EXTINF':
-          if (!isNaN(tag.value.duration)) {
-            currentObj.duration = tag.value.duration;
-          }
-          // Video.js doesn't seem to do anything with the `title` attribute??
-          // if (tag.value.title && tag.value.title.length) {
-          //   currentObj.title = tag.value.title;
-          // }
-          break;
-        case '#EXT-X-BYTERANGE':
-          currentObj.byterange = tag.value;
+        return;
+      }
 
-          // It's possible for the offset to be missing in which case, it's calculated
-          if (isNaN(currentObj.byterange.offset)) {
-            currentObj.byterange.offset = last.byterange.offset + last.byterange.length;
-          }
-          break;
-        case '#EXT-X-DISCONTINUITY':
-          currentObj.discontinuity = true;
-          currentObj.timeline = ++currentDisco;
-          discoStarts.push(output.length);
-          break;
-        case '#EXT-X-KEY':
-          currentObj.key = {};
-          const method = findAttr(tag, 'METHOD')?.value;
-          const uri = findAttr(tag, 'URI')?.value;
-          const iv = findAttr(tag, 'IV')?.value;
-
-          if (method) {
-            if (method === 'NONE') {
-              delete currentObj.key;
-              return;
-            }
-            currentObj.key.method = method;
-          }
-          if (uri) {
-            currentObj.key.uri = uri;
-          }
-          if (iv) {
-            currentObj.key.iv = new Uint32Array(switchEndianness(iv));
-          }
-          break;
-        case '#EXT-X-MAP':
-          currentObj.map = {
-            byterange: findAttr(tag, 'BYTERANGE')?.value,
-            uri: findAttr(tag, 'URI')?.value
-          };
-          break;
-        case '#EXT-X-PROGRAM-DATE-TIME':
-          // Why does video.js store two copies of the same value?
-          // No one knows!
-          currentObj.dateTimeString = tag.value.toISOString();
-          currentObj.dateTimeObject = tag.value;
-
-          // We also set the "global" dateTime values to the very first PDT we encounter
-          if (!videojsObj.dateTimeString) {
-            videojsObj.dateTimeString = tag.value.toISOString();
-            videojsObj.dateTimeObject = tag.value;
-          }
-          break;
-        case '#EXT-X-DATERANGE':
-          // TODO: Figure out what this should look like...
-          break;
-        case '#EXT-X-CUE-OUT':
-          currentObj.cueOut = tag.value;
-          break;
-        case '#EXT-X-CUE-OUT-CONT':
-          currentObj.cueOutCont = `${tag.value.seconds}/${tag.value.totalDuration}`;
-          break;
-        case '#EXT-X-CUE-IN':
-          currentObj.cueIn = true;
-          break;
-        default:
-          if (tag.isCustom) {
-            setProperty(currentObj, ['custom', camelCaseTag(tag.name)], tag.value);
-          }
-          break;
+      switch (tag.name) {
+      case '#EXTINF':
+        if (!isNaN(tag.value.duration)) {
+          currentObj.duration = tag.value.duration;
         }
+        // Video.js doesn't seem to do anything with the `title` attribute??
+        // if (tag.value.title && tag.value.title.length) {
+        //   currentObj.title = tag.value.title;
+        // }
+        break;
+      case '#EXT-X-BYTERANGE':
+        currentObj.byterange = tag.value;
+
+        // It's possible for the offset to be missing in which case, it's calculated
+        if (isNaN(currentObj.byterange.offset)) {
+          currentObj.byterange.offset = last.byterange.offset + last.byterange.length;
+        }
+        break;
+      case '#EXT-X-DISCONTINUITY':
+        currentObj.discontinuity = true;
+        currentObj.timeline = ++currentDisco;
+        discoStarts.push(output.length);
+        break;
+      case '#EXT-X-KEY':
+        currentObj.key = {};
+        const method = findAttr(tag, 'METHOD')?.value;
+        const uri = findAttr(tag, 'URI')?.value;
+        const iv = findAttr(tag, 'IV')?.value;
+
+        if (method) {
+          if (method === 'NONE') {
+            delete currentObj.key;
+            return;
+          }
+          currentObj.key.method = method;
+        }
+        if (uri) {
+          currentObj.key.uri = uri;
+        }
+        if (iv) {
+          currentObj.key.iv = new Uint32Array(switchEndianness(iv));
+        }
+        break;
+      case '#EXT-X-MAP':
+        currentObj.map = {
+          byterange: findAttr(tag, 'BYTERANGE')?.value,
+          uri: findAttr(tag, 'URI')?.value
+        };
+        break;
+      case '#EXT-X-PROGRAM-DATE-TIME':
+        // Why does video.js store two copies of the same value?
+        // No one knows!
+        currentObj.dateTimeString = tag.value.toISOString();
+        currentObj.dateTimeObject = tag.value;
+
+        // We also set the "global" dateTime values to the very first PDT we encounter
+        if (!videojsObj.dateTimeString) {
+          videojsObj.dateTimeString = tag.value.toISOString();
+          videojsObj.dateTimeObject = tag.value;
+        }
+        break;
+      case '#EXT-X-DATERANGE':
+        // TODO: Figure out what this should look like...
+        /*
+          currentObj.dateRanges = {
+            id: {
+              startTime,
+              class?,
+              endDate?,
+              duration?,
+              plannedDuration?,
+              endOnNext?,
+              scte35Cmd?,
+              scte35Out?,
+              scte35In?,
+              clientAttributes?: {
+              }
+            }
+          };
+        */
+        break;
+      case '#EXT-X-CUE-OUT':
+        currentObj.cueOut = tag.value;
+        break;
+      case '#EXT-X-CUE-OUT-CONT':
+        currentObj.cueOutCont = `${tag.value.seconds}/${tag.value.totalDuration}`;
+        break;
+      case '#EXT-X-CUE-IN':
+        currentObj.cueIn = true;
+        break;
+      case 'comment':
+        const comments = currentObj.comments || (currentObj.comments = []);
+
+        comments.push(tag.value);
+        break;
+      default:
+        if (tag.isCustom) {
+          setProperty(currentObj, ['custom', camelCaseTag(tag.name)], tag.value);
+        }
+        break;
       }
     });
 
@@ -504,6 +539,15 @@ const fromSegments = (createTag, output, videojsObj) => {
 
   segments.forEach((segmentEntry) => {
     const segmentArr = [];
+
+    if (Array.isArray(segmentEntry.comments)) {
+      segmentEntry.comments.forEach((comment) => {
+        const tag = createTag('comment');
+
+        tag.value = comment;
+        segmentArr.push(tag);
+      });
+    }
 
     if (segmentEntry) {
       const tag = createTag('#EXTINF');
@@ -627,10 +671,10 @@ const fromSegments = (createTag, output, videojsObj) => {
       segmentArr.push(tag);
     }
 
-    segmentArr.push({
-      lineType: 'uri',
-      value: segmentEntry.uri
-    });
+    const uriObj = createTag('uri');
+
+    uriObj.value = segmentEntry.uri;
+    segmentArr.push(uriObj);
 
     output.segments.push(segmentArr);
   });
@@ -651,7 +695,6 @@ export default class VideojsCodec extends M3U8NestedCodec {
     // The videojs parser supports some odd tag-types
     this.setCustomTag({
       name: '#EXT-X-CUE-IN',
-      type: null,
       playlistType: 'media',
       appliesToNextUri: true,
       isCustom: false

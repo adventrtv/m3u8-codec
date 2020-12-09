@@ -12,16 +12,16 @@ const groupPlaylistObject = (hlsObject) => {
   let pendingUriTags = [];
 
   hlsObject.forEach((obj) => {
-    if (obj.lineType === 'empty') {
+    if (obj.name === 'empty') {
       return;
     }
 
-    if (obj.lineType === 'comment') {
+    if (obj.name === 'comment') {
       commentStack.push(obj);
       return;
     }
 
-    if (obj.lineType === 'tag') {
+    if (obj.name !== 'uri') {
       if (!obj.appliesToNextUri) {
         if (commentStack.length) {
           groupedLines.globals = groupedLines.globals.concat(commentStack);
